@@ -1,0 +1,61 @@
+// try{
+// 	Py_Initialize();
+// 	PyObject *pName, *pModule, *pDict, *pFunc, *pArgs;
+// 	PyObject * main_module = PyImport_AddModule("__main__");
+
+// 	// append sys path (to import our py_mfcc module)
+// 	// char* path = Py_GetPath();
+// 	// char current_path[FILENAME_MAX];
+// 	// getcwd(current_path, sizeof(current_path));
+// 	// char* new_path = new char[strlen(path) + strlen(current_path) + 5];
+// 	// new_path[0] = '\0';
+// 	// strcat(new_path, path);
+// 	// strcat(new_path, ":");
+// 	// strcat(new_path, current_path);
+// 	// PySys_SetPath(new_path);
+
+// 	// import all modules
+// 	// PyObject * sub_modules = PyList_New(0);
+// 	// PyList_Append(sub_modules, PyString_FromString("mfcc"));
+// 	// PyList_Append(sub_modules, PyString_FromString("logfbank"));
+// 	// PyObject * py_speech_imports = PyImport_ImportModuleEx("python_speech_features", NULL, NULL, sub_modules);
+// 	// PyObject * mfcc_module = PyObject_GetAttr(py_speech_imports, PyString_FromString("mfcc"));
+// 	// PyImport_ImportModule("numpy");
+
+// 	// import main module
+// 	PySys_SetPath(".");
+// 	pName = PyString_FromString("py_mfcc");
+// 	pModule = PyImport_Import(pName);
+
+// 	if(pModule){
+// 		// get function
+// 		pDict = PyModule_GetDict(pModule);
+// 		pFunc = PyDict_GetItemString(pDict, "asdasdasd");
+		
+// 		// create args
+// 		pArgs = PyTuple_New(1);
+// 		PyTuple_SetItem(pArgs, 0, PyString_FromString(this->path_to_channel_amplitudes.c_str()));
+
+// 		// function results
+// 		PyObject* pResult = PyObject_CallObject(pFunc, pArgs);
+// 		if(pResult == NULL){
+// 			printf("Calling python method failed.\n");
+// 		}
+// 		else{
+// 			if(PyInt_AsLong(pResult)){
+// 				std::cout << "Script running completed successfully!\n";
+// 			}
+// 			else{
+// 				std::cout << "Error while running python script!\n";
+// 			}
+// 		}
+// 	}
+// 	else{
+// 		std::cout << "Error loading python module.\n";
+// 	}
+
+// 	Py_Finalize();
+// }
+// catch(std::exception& e) {
+// 	std::cout << "PythonMfcc::calculate_python_mfcc(). Exception while running python script for calculating mfcc.\n";
+// }
