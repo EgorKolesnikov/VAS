@@ -1,17 +1,26 @@
-#include <iostream>
-#include <vector>
-#include <string>
-#include <cstring>
-#include "../wav_file.cpp"
-
+#include "../include_all.h"
 
 int main(){
-	std::string path_to_big_wav = "/home/kolegor/011A-11.wav"; // "/home/kolegor/Code/Wav/data/raw_data/big_1.wav";
-	std::string path_to_save_parsed_results = "/home/kolegor/Code/Wav/data/raw_data/parsed_big_wavs/";
+	std::string my_voice_folder = "wav_files/wav_my_voice/";
+	std::string other_voice_folder = "wav_files/wav_other_voice/";
+	std::string output_files_folder = "files_features/";
+	std::string filepath_to_predict_features = "../data/nn_data/test_record.txt";
+	std::string filepath_to_store_result = "../data/nn_data/last_prediction.txt";
+	std::string filepath_to_store_testing_wav = "../data/recorded.wav";
 
-	WavFile wf(path_to_big_wav);
-	wf.get_header().print();
+	int number_of_mfcc_features = 13;
+	int number_of_fbank_features = 26;
+	int sound_sample_rate = 44100;
+	int sound_seconds_length = 2;
 
-	std::cout << std::endl;
+	AuthenticationKernel ak(
+		my_voice_folder, other_voice_folder, output_files_folder,
+		sound_sample_rate, sound_seconds_length, 
+		number_of_mfcc_features, number_of_fbank_features
+	);
+
+	ak.parse_wav_files(FEATURES::MFCC, 88200);
+
+	std::cout << "\nDone" << std::endl;
 	return 0;
 }

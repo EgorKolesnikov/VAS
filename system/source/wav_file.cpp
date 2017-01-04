@@ -104,6 +104,10 @@ void WavFile::load(const std::string& filename){
 	this->init(filename);
 }
 
+int WavFile::get_size_in_bytes(){
+	return (this->wav_header).subchunk2_size;
+}
+
 WavHeader WavFile::get_header(){
 	return this->wav_header;
 }
@@ -140,6 +144,22 @@ void WavFile::write_first_channel(const std::string& destination_file, bool bina
 	else{
 		for(int byte_in_channel = 0; byte_in_channel < channels[0].size(); ++byte_in_channel){
 			outf << int(channels[0][byte_in_channel]) << " ";
+		}
+		outf << "\n";
+	}
+	outf.close();
+}
+
+void WavFile::write_first_channel_piece(const std::string& destination_file, int start_index, int end_index, bool binary){
+	std::ofstream outf(destination_file);
+	if(binary){
+		for(int bytes_iterator = start_index; bytes_iterator < end_index; ++bytes_iterator){
+			outf << this->data[bytes_iterator];
+		}
+	}
+	else{
+		for(int bytes_iterator = start_index; bytes_iterator < end_index; ++bytes_iterator){
+			outf << int(this->data[bytes_iterator]) << " ";
 		}
 		outf << "\n";
 	}

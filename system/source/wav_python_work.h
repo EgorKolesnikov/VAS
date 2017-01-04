@@ -53,7 +53,7 @@ public:
 	int calculate_python_mfcc(int number_of_mfcc_features, const std::string& path_to_store_python_results);
 	void complete_python_mfcc_work(const std::string& path_to_python_mfcc_results);
 
-	int calculate_python_fbank(const std::string& path_to_store_python_fbank_results);
+	int calculate_python_fbank(int number_of_fbank_features, const std::string& path_to_store_python_fbank_results);
 	void complete_python_fbank_work(const std::string& path_to_python_fbank_results);
 
 
@@ -65,8 +65,12 @@ public:
 	void write_completed_fbank_features(const std::string& path_to_store_complete_fbank_features);
 	void write_completed_mfcc_and_fbank_features(const std::string& path_to_store_complete_fbank_features);
 
+	void append_completed_mfcc_features(std::ostream& outf);
+	void append_completed_fbank_features(std::ostream& outf);
+	void append_completed_mfcc_and_fbank_features(std::ostream& outf);
+
 };
 
-std::string PythonMfcc::_main_folder = "/home/kolegor/Code/Wav/";
+std::string PythonMfcc::_main_folder = "/home/kolegor/Code/VAS/";
 
 #endif

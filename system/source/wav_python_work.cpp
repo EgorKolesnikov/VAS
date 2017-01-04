@@ -96,7 +96,7 @@ PythonMfcc::PythonMfcc(const std::string& amplitudes_filepath, int s_rate, int f
 
 int PythonMfcc::calculate_python_mfcc(int number_of_mfcc_features, const std::string& path_to_store_python_results){
 	try{
-		std::string command = "python " + PythonMfcc::_main_folder + "source/py_features.py mfcc ";
+		std::string command = "python " + PythonMfcc::_main_folder + "system/source/py_features.py mfcc ";
 		command += this->path_to_channel_amplitudes;
 		command += " " + path_to_store_python_results;
 		command += " " + std::to_string(this->sample_rate);
@@ -130,9 +130,9 @@ void PythonMfcc::complete_python_mfcc_work(const std::string& path_to_python_mfc
 }
 
 
-int PythonMfcc::calculate_python_fbank(const std::string& path_to_store_python_fbank_results){
+int PythonMfcc::calculate_python_fbank(int number_of_fbank_features, const std::string& path_to_store_python_fbank_results){
 	try{
-		std::string command = "python " + PythonMfcc::_main_folder + "source/py_features.py fbank ";
+		std::string command = "python " + PythonMfcc::_main_folder + "system/source/py_features.py fbank ";
 		command += this->path_to_channel_amplitudes;
 		command += " " + path_to_store_python_fbank_results;
 		command += " " + std::to_string(this->sample_rate);
@@ -210,5 +210,47 @@ void PythonMfcc::write_completed_mfcc_and_fbank_features(const std::string& path
 	}
 	catch(std::exception& e){
 		std::cout << "void PythonMfcc::write_completed_mfcc_and_fbank_features(const std::string&).Exception while saving complete fbank features.\n";
+	}
+}
+
+void PythonMfcc::append_completed_mfcc_features(std::ostream& outf){
+	try{
+		for(int feature_index = 0; feature_index < this->complete_file_mfcc_features.size(); ++feature_index){
+			outf << double(this->complete_file_mfcc_features[feature_index]) << " ";
+		}
+		outf << "\n";
+		outf.flush();
+	}
+	catch(std::exception& e){
+		std::cout << "void PythonMfcc::append_completed_mfcc_features(std::ostream& outf). Exception while saving complete fbank features.\n";
+	}
+}
+
+void PythonMfcc::append_completed_fbank_features(std::ostream& outf){
+	try{
+		for(int feature_index = 0; feature_index < this->complete_file_fbank_features.size(); ++feature_index){
+			outf << double(this->complete_file_fbank_features[feature_index]) << " ";
+		}
+		outf << "\n";
+		outf.flush();
+	}
+	catch(std::exception& e){
+		std::cout << "void PythonMfcc::append_completed_fbank_features(std::ostream& outf). Exception while saving complete fbank features.\n";
+	}
+}
+
+void PythonMfcc::append_completed_mfcc_and_fbank_features(std::ostream& outf){
+	try{
+		for(int feature_index = 0; feature_index < this->complete_file_mfcc_features.size(); ++feature_index){
+			outf << double(this->complete_file_mfcc_features[feature_index]) << " ";
+		}
+		for(int feature_index = 0; feature_index < this->complete_file_fbank_features.size(); ++feature_index){
+			outf << double(this->complete_file_fbank_features[feature_index]) << " ";
+		}
+		outf << "\n";
+		outf.flush();
+	}
+	catch(std::exception& e){
+		std::cout << "void PythonMfcc::append_completed_mfcc_and_fbank_features(std::ostream& outf). Exception while saving complete fbank features.\n";
 	}
 }

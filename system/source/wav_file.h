@@ -85,8 +85,10 @@ public:
 	void load(const std::string& filename);
 	WavHeader get_header();
 
+	int get_size_in_bytes();
 	std::vector<std::vector<char>> get_channels();
 	void write_first_channel(const std::string& destination_file, bool binary = true);
+	void write_first_channel_piece(const std::string& destination_file, int start_index, int end_index, bool binary = true);
 
 	static void create_wav(std::string& filename, const WavHeader& wav_header, const std::vector<std::vector<char>>& channels);
 };
