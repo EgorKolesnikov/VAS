@@ -113,13 +113,26 @@ WavHeader WavFile::get_header(){
 }
 
 std::vector<std::vector<char>> WavFile::get_channels() {
+	/*
+	*	Return data from wav files as vector of channels data.
+	*	Channel is vector of bytes. Data splitted into channels
+	*	as follows: 1 2 3 .. n 1 2 3 ... n 1 2 3 ... n ...
+	*	(where 1 2 3 ... n - in which channel to save byte in current index)
+	*/
+
+	// TODO: use 'int one_channel_tick_length'
+
 	try {
 		int bytes_in_one_channel = this->wav_header.subchunk2_size / this->wav_header.num_channels;
 		int one_channel_tick_length = this->wav_header.bits_per_sample / 8;
 		
 		std::vector<std::vector<char>> channels(this->wav_header.num_channels);
+
+		// saving channel by channel (first full first channel data, then second and so on)
 		for(int channel = 0; channel < this->wav_header.num_channels; ++channel){
 			channels[channel].reserve(bytes_in_one_channel);
+
+			// fill current channels data (step bytes by this->wav_header.num_channels positions)
 			for(int input_byte = 0; input_byte < this->wav_header.subchunk2_size; input_byte += this->wav_header.num_channels){
 				channels[channel].push_back(this->data[input_byte + channel]);
 			}
@@ -129,13 +142,20 @@ std::vector<std::vector<char>> WavFile::get_channels() {
 	}
 	catch(std::exception& e){
 		std::cout << "Exception while extracting channels from wav file.\n";
+		std::cout << e.what() << '\n';
 	}
 }
 
 void WavFile::write_first_channel(const std::string& destination_file, bool binary){
-	std::vector<std::vector<char>> channels = this->get_channels();
+	/*
+	*	Saving first channel data (bytes) into destination file.
+	*	If binary = true then result file will be in binary format
+	*	else - destination file will contain bytes splitted by ' '
+	*/
 
+	std::vector<std::vector<char>> channels = this->get_channels();
 	std::ofstream outf(destination_file);
+
 	if(binary){
 		for(int byte_in_channel = 0; byte_in_channel < channels[0].size(); ++byte_in_channel){
 			outf << channels[0][byte_in_channel];
@@ -151,6 +171,11 @@ void WavFile::write_first_channel(const std::string& destination_file, bool bina
 }
 
 void WavFile::write_first_channel_piece(const std::string& destination_file, int start_index, int end_index, bool binary){
+	/*
+	*	Save specified piece of data bytes into destination_file (same as above).
+	*	Interval of bytes to save is represented through start_index and end_index.
+	*	Note: no checks for segmentation errors.
+	*/
 	std::ofstream outf(destination_file);
 	if(binary){
 		for(int bytes_iterator = start_index; bytes_iterator < end_index; ++bytes_iterator){
@@ -167,6 +192,12 @@ void WavFile::write_first_channel_piece(const std::string& destination_file, int
 }
 
 void WavFile::create_wav(std::string& filename, const WavHeader& wav_header, const std::vector<std::vector<char>>& channels){
+	/*
+	*	Used for testing WavFile and WavHeader classes.
+	*   Open wav file, read data and header into different structures
+	*	and then save file anew (with same data and header)
+	*/
+
 	std::fstream outf(filename, std::fstream::out | std::fstream::binary);
 	outf.write((char*)&wav_header, sizeof(wav_header));
 
@@ -185,6 +216,10 @@ void WavFile::create_wav(std::string& filename, const WavHeader& wav_header, con
 */
 
 int WavFile::get_file_byte_size(std::fstream& file){
+	/*
+	*	Find out file size in bytes (file as stream)	
+	*/
+
 	file.seekg (0, file.end);
     int length = file.tellg();
     file.seekg (0, file.beg);
@@ -192,20 +227,33 @@ int WavFile::get_file_byte_size(std::fstream& file){
 }
 
 void WavFile::init(const std::string& filename){
+	/*
+	*	Initializing class instance data (WavHeader and char *data).
+	*	Read wav file as binary file (WavHeader::HEADER_SIZE for header data;
+	*	rest is for this->data)
+	*/
+
 	try {
 		std::fstream inf(filename, std::fstream::in | std::fstream::binary);
 		if(inf.is_open()){
+			// initialize this->header
 			inf.read((char*)&(this->wav_header), sizeof(this->wav_header));
+			
+			// from this->header find out data size in bytes
 			data = new char[(this->wav_header).subchunk2_size];
+
+			// read the rest of wav file data into this->data
 			inf.read(data, (this->wav_header).subchunk2_size);
 			inf.close();	
 		}
 		else{
-			throw "Can't open file: " + filename;
+			std::cout << "Can't open file: " + filename << "\n";
+			throw std::exception();
 		}
 	}
 	catch(std::exception& e) {
 		std::cout << "Exception in WavFile init()\n";
+		std::cout << e.what() << '\n';
 	}
 }
 

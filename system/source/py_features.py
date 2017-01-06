@@ -6,14 +6,15 @@ from python_speech_features import mfcc
 from python_speech_features import logfbank
 
 
-def run_python_mfcc(path_to_wav_amplitudes, path_to_output_features, sample_rate, file_sounds_length, number_of_mfcc_features):
+def run_python_mfcc(path_to_wav_amplitudes, path_to_output_features, sample_rate, file_sounds_length, number_of_mfcc_features, normilize):
 	with open(path_to_wav_amplitudes, 'rb') as inf:
 		values = inf.read().split(' ')[:-1]
 		amplitudes = map(lambda x: ctypes.c_ubyte(int(x)).value, values)
 		amplitudes = [struct.unpack("h", bytearray([a, b]))[0] for a, b in zip(amplitudes[:-1], amplitudes[1:])]
 
+	amplitudes = np.array(amplitudes, dtype=float) / max(amplitudes) if normilize == '1' else np.array(amplitudes)
 	result_frames_features = mfcc(
-		np.array(amplitudes), samplerate=int(sample_rate), numcep=int(number_of_mfcc_features),
+		amplitudes, samplerate=int(sample_rate), numcep=int(number_of_mfcc_features),
 		lowfreq=20, highfreq=20000, winfunc=lambda x: np.hamming(x)
 	)
 
@@ -22,14 +23,15 @@ def run_python_mfcc(path_to_wav_amplitudes, path_to_output_features, sample_rate
 			outf.write(' '.join(map(lambda x: str(x), result_frames_features[frame_index])) + '\n')
 
 
-def run_python_filterbank(path_to_wav_amplitudes, path_to_output_features, sample_rate):
+def run_python_filterbank(path_to_wav_amplitudes, path_to_output_features, sample_rate, normilize):
 	with open(path_to_wav_amplitudes, 'rb') as inf:
 		values = inf.read().split(' ')[:-1]
 		amplitudes = map(lambda x: ctypes.c_ubyte(int(x)).value, values)
 		amplitudes = [struct.unpack("h", bytearray([a, b]))[0] for a, b in zip(amplitudes[:-1], amplitudes[1:])]
 
+	amplitudes = np.array(amplitudes, dtype=float) / max(amplitudes) if normilize == '1' else np.array(amplitudes)
 	result_frames_features = logfbank(
-		np.array(amplitudes), samplerate=int(sample_rate),
+		amplitudes, samplerate=int(sample_rate),
 		lowfreq=20, highfreq=20000
 	)
 

@@ -14,7 +14,7 @@ def create_nn(input_dim_=13):
     return model
 
 
-def train_nn(path_to_train, path_to_test, path_to_save_nn_dump, input_dim):
+def train_nn(path_to_train, path_to_test, path_to_save_nn_dump):
     df, X = pandas.read_csv(path_to_train), []
     for record in df['Features'].values:
         X.extend([float(a) for a in record.split(' ')[:-1]])
@@ -28,7 +28,7 @@ def train_nn(path_to_train, path_to_test, path_to_save_nn_dump, input_dim):
     del nn
 
 
-def predict(test_record_filepath, load_model_from, path_to_store_result):
+def predict(test_record_filepath, load_model_from, path_to_store_result, normilize=False):
     nn = keras.models.load_model(load_model_from)
     with open(test_record_filepath, 'r') as inf:
         features = map(lambda x: float(x), inf.read().split(' ')[:-1])

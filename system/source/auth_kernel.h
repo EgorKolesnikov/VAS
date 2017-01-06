@@ -25,6 +25,17 @@ enum class FEATURES{
 
 class AuthenticationKernel{
 
+	/*
+	*	AuthenticationKernel class provides interface to manage neural network work, such as
+	*	 - parse wav file data (voice samples) to train neural network
+	*	 - train neural network with parsed data
+	*	 - test neural network with newly recorded voice sample
+	*	
+	*	If large wav files are passed to be trained on, then these wav files are splitted
+	*	into smaller pieces (2 seconds duration) and later work is managed with that pieces separately.
+	*	(those pieces are not being saved anywhere, they are proceeded online)
+	*/
+
 	static std::string MAIN_FOLDER;							// path to VAS folder (main project folder)
 	static std::string TEMP_CHANNEL_OUTPUT_PATH;			// filepath to save first channel from wav file
 	static std::string TEMP_FRAMES_OUTPUT_PATH;				// filepath to save frames (splitted from wav file)
@@ -50,6 +61,7 @@ private:
 	int sound_seconds_length_;								// wav files duration (I think we do not need that)
 	int number_of_mfcc_features_;							// number of mfcc coeffs to create for each wav file
 	int number_of_fbank_features_;							// number of fbank coeffs to create for each wav file
+	bool normilize_audio;									// normilize audio files or not
 
 
 protected:
@@ -70,17 +82,23 @@ public:
 		, int sound_seconds_length
 		, int nb_mfcc_features
 		, int nb_fbank_features
+		, bool normilize = false
 	);
 
 	// parse all wav files in 'this->wav_my_voice_folder_' and 'this->wav_other_voice_folder_' folders
 	void parse_wav_files(FEATURES type = FEATURES::MFCC_FBANK, int wav_split_length = 88200);
 
+	// create train test from parsed audio files
+	void create_train_test(double train_size = 1.0);
 	
-	// void create_train_test(double train_size = 1.0);
-	// int fit();
-	// int predict(const std::string& filepath_to_predict, const std::string& path_to_store_result);
-	// int predict_wav(const std::string& path_to_wav, FEATURES type = FEATURES::MFCC_FBANK);
+	// train neural network and save dump 
+	int fit();
+	
+	// run python script to test recorded voice in neural network
+	int predict(const std::string& filepath_to_predict, const std::string& path_to_store_result);
 
+	// parse recorded voice audio and prepare data for neural network
+	int predict_wav(const std::string& path_to_wav, FEATURES type = FEATURES::MFCC_FBANK);
 };
 
 

@@ -8,6 +8,7 @@
 #   --nb-mfcc=...               : number of mfcc coefficients (int)
 #   --nb-fbank=...              : number of filterbanks (int)
 #   --reparse_wav               : if we want to reparse all wav files (only when training)
+#   -n, --norm                  : normilize audio file or not
 #
 ################################################################################################
 
@@ -69,6 +70,7 @@ parameters[features]="both"
 parameters[nb_mfcc]=13
 parameters[nb_fbank]=26
 parameters[reparse_wav]=0
+parameters[norm]=0
 
 source_folder="system/source/"
 main_interface_folder="system/"
@@ -106,6 +108,9 @@ while :; do
         --reparse_wav)
             parameters[reparse_wav]=1
             ;;
+        -n|--norm)
+            parameters[norm]=1
+            ;;
         -?*)
             printf "ERROR: Unknown option: $1\n"
             exit
@@ -130,18 +135,18 @@ fi
 
 # train or test out system
 if [[ ${parameters[mode]} == "train" ]]; then
-    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]}
+    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]} ${parameters[norm]}
 else
     # Prepare user for recording
     printf "SYS: You will have 2 seconds to record your voice. Recording will start in\n"
     sleep 3
     for i in {3..1}; do echo "$i..." && sleep 1; done
     echo "RECORDING..."
-    (python wav_record.py "data/recorded.wav")
+    (python "$main_interface_folder"wav_record.py "data/recorded.wav")
 
     # Run nn classification
-    printf "\nSYS: Running neural network to classify your voice."
-    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]}
+    printf "\nSYS: Running neural network to classify your voice.\n"
+    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]} ${parameters[norm]}
 
     # Check the results
     read -d $'\x04' name < "$classification_result_file"
