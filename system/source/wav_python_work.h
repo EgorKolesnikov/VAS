@@ -13,6 +13,8 @@
 #include <cassert>
 #include <stdio.h>
 #include <unistd.h>
+#include <chrono>
+#include <thread>
 
 
 class PythonMfcc{
@@ -22,7 +24,7 @@ class PythonMfcc{
 	*	for MFCC and Filterbank features calculation 
 	*/
 
-	static std::string _main_folder;								// Path to VAS directory (with VAS in path)
+	static std::string MAIN_FOLDER; 								// Path to VAS directory (with VAS in path)
 
 private:
 	std::string path_to_channel_amplitudes;							// filepath to load wav file first channel data (should be saved in binary)
@@ -33,8 +35,8 @@ private:
 	std::vector<double> complete_file_fbank_features;				// same as above but for filterbank features
 	
 	int sample_rate;												// wav file sample rate
-	int file_seconds_length;										// wav file length in seconds
 	bool normilize_audio;											// whether or not we want to normilize channel data
+	bool check_for_silence;											// parse and train only on not silence wav file pieces
 
 
 protected:
@@ -55,9 +57,9 @@ protected:
 public:
 	PythonMfcc(
 		const std::string& amplitudes_filepath
-		, int s_rate
-		, int f_seconds_length
+		, int audio_sample_rate
 		, bool normilize = false
+		, bool detect_silence = false
 	);
 
 
@@ -98,6 +100,6 @@ public:
 
 };
 
-std::string PythonMfcc::_main_folder = "/home/kolegor/Code/VAS/";
+std::string PythonMfcc::MAIN_FOLDER = "/home/kolegor/Code/VAS/";
 
 #endif

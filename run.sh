@@ -1,15 +1,18 @@
 #!/bin/bash
 
 #################################################################################################
-#
-#   -r, --recompile             : if we want to recompile all source or not
-#   -m, --mode=...              : 'train' or 'test'
-#   --features=...              : features to create for each wav file ('mfcc', 'fbank', 'both')
-#   --nb-mfcc=...               : number of mfcc coefficients (int)
-#   --nb-fbank=...              : number of filterbanks (int)
-#   --reparse_wav               : if we want to reparse all wav files (only when training)
-#   -n, --norm                  : normilize audio file or not
-#
+
+usage_help="
+   -r, --recompile      : if we want to recompile all source or not
+   -m, --mode=...       : 'train' or 'test'
+   --features=...       : features to create for each wav file ('mfcc', 'fbank', 'both')
+   --nb-mfcc=...        : number of mfcc coefficients (int)
+   --nb-fbank=...       : number of filterbanks (int)
+   --reparse_wav        : if we want to reparse all wav files (only when training)
+   -n, --norm           : normilize audio file or not
+   -s, --silence        : do not work with silence parts of wav file
+"
+
 ################################################################################################
 
 
@@ -71,6 +74,7 @@ parameters[nb_mfcc]=13
 parameters[nb_fbank]=26
 parameters[reparse_wav]=0
 parameters[norm]=0
+parameters[silence]=0
 
 source_folder="system/source/"
 main_interface_folder="system/"
@@ -85,6 +89,7 @@ classification_result_file="data/nn_data/last_recorded_wav_prediction.txt"
 while :; do 
     case $1 in
         -h|-\?|--help)
+            echo "$usage_help"
             exit
             ;;
         -r|--recompile)
@@ -111,6 +116,9 @@ while :; do
         -n|--norm)
             parameters[norm]=1
             ;;
+        -s|--silence)
+            parameters[silence]=1
+            ;;
         -?*)
             printf "ERROR: Unknown option: $1\n"
             exit
@@ -135,7 +143,7 @@ fi
 
 # train or test out system
 if [[ ${parameters[mode]} == "train" ]]; then
-    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]} ${parameters[norm]}
+    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]} ${parameters[norm]} ${parameters[silence]}
 else
     # Prepare user for recording
     printf "SYS: You will have 2 seconds to record your voice. Recording will start in\n"
@@ -146,7 +154,7 @@ else
 
     # Run nn classification
     printf "\nSYS: Running neural network to classify your voice.\n"
-    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]} ${parameters[norm]}
+    $main_interface_folder./executable ${parameters[mode]} ${parameters[features]} ${parameters[nb_mfcc]} ${parameters[nb_fbank]} ${parameters[reparse_wav]} ${parameters[norm]} ${parameters[silence]}
 
     # Check the results
     read -d $'\x04' name < "$classification_result_file"

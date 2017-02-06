@@ -50,18 +50,21 @@ class AuthenticationKernel{
 
 private:
 
-	std::string data_folder_;								// path to folder with data (all wav files, parsed wav files etc.)			
-	std::string wav_my_voice_folder_;						// path to folder with legal users voice data
-	std::string wav_other_voice_folder_;					// path to folder with other users voice data
-	std::string output_folder_with_all_voices_;				// path to store features file for each wav file (more in parse_wav_file(...))
+	std::string data_folder_;								// path to folder with data (all wav files, parsed wav files etc.)
 	std::string path_to_train_;								// path to train file
 	std::string path_to_test_;								// path to test file
 
+	std::string wav_my_voice_folder_;						// path to folder with legal users voice data
+	std::string wav_other_voice_folder_;					// path to folder with other users voice data
+	std::string output_folder_with_all_voices_;				// path to store features file for each wav file (more in parse_wav_file(...))
+
+	int wav_split_window_length_;							// length (number audio measures) to split each wav file while creating features 
+	int wav_split_window_step_;								// step for each splitted window
 	int sound_sample_rate_;									// sample rate of each wav file (should be same)
-	int sound_seconds_length_;								// wav files duration (I think we do not need that)
 	int number_of_mfcc_features_;							// number of mfcc coeffs to create for each wav file
 	int number_of_fbank_features_;							// number of fbank coeffs to create for each wav file
 	bool normilize_audio;									// normilize audio files or not
+	bool check_for_silence;									// parse and train only on not silence wav file pieces
 
 
 protected:
@@ -70,7 +73,7 @@ protected:
 	std::vector<std::string> get_list_of_files(const std::string& directory_path);
 
 	// parse wav file (more info in method implementation)
-	void parse_wav_file(const std::string& path_to_wav, const std::string& path_to_store_result, FEATURES type = FEATURES::MFCC_FBANK, int wav_split_length = 88200);
+	void parse_wav_file(const std::string& path_to_wav, const std::string& path_to_store_result, FEATURES type = FEATURES::MFCC_FBANK);
 
 
 public:
@@ -78,20 +81,22 @@ public:
 		const std::string& wav_my_voice_folder
 		, const std::string& wav_other_voice_folder
 		, const std::string& output_folder
+		, int split_window_length
+		, int split_window_step
 		, int sound_sample_rate
-		, int sound_seconds_length
 		, int nb_mfcc_features
 		, int nb_fbank_features
 		, bool normilize = false
+		, bool detect_silence = false
 	);
 
 	// parse all wav files in 'this->wav_my_voice_folder_' and 'this->wav_other_voice_folder_' folders
-	void parse_wav_files(FEATURES type = FEATURES::MFCC_FBANK, int wav_split_length = 88200);
+	void parse_wav_files(FEATURES type = FEATURES::MFCC_FBANK);
 
 	// create train test from parsed audio files
 	void create_train_test(double train_size = 1.0);
 	
-	// train neural network and save dump 
+	// train neural network and save dump of trained model
 	int fit();
 	
 	// run python script to test recorded voice in neural network

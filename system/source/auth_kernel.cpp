@@ -8,23 +8,27 @@ AuthenticationKernel::AuthenticationKernel(
 	const std::string& wav_my_voice_folder
 	, const std::string& wav_other_voice_folder
 	, const std::string& output_folder
+	, int split_window_length
+	, int split_window_step
 	, int s_rate
-	, int s_seconds_length
 	, int nb_mfcc_features
 	, int nb_fbank_features
 	, bool normilize
+	, bool detect_silence
 )
 	: data_folder_(AuthenticationKernel::MAIN_FOLDER + "data/")
 	, wav_my_voice_folder_(data_folder_ + wav_my_voice_folder)
 	, wav_other_voice_folder_(data_folder_ + wav_other_voice_folder)
 	, output_folder_with_all_voices_(data_folder_ + output_folder)
+	, wav_split_window_length_(split_window_length)
+	, wav_split_window_step_(split_window_step)
 	, sound_sample_rate_(s_rate)
-	, sound_seconds_length_(s_seconds_length)
 	, number_of_mfcc_features_(nb_mfcc_features)
 	, number_of_fbank_features_(nb_fbank_features)
 	, path_to_train_(data_folder_ + "nn_data/_train.txt")
 	, path_to_test_(data_folder_ + "nn_data/_test.txt")
 	, normilize_audio(normilize)
+	, check_for_silence(detect_silence)
 { }
 
 
@@ -58,12 +62,13 @@ std::vector<std::string> AuthenticationKernel::get_list_of_files(const std::stri
 	return list_of_files;
 }
 
-void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const std::string& path_to_store_result, FEATURES type, int wav_split_length){
+void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const std::string& path_to_store_result, FEATURES type){
 	/*
-	*	Parse specified wav file. Wav file can be any duration. It will be splitted in parts about 88200
-	*   (or can be specified through parameter) elements in each part. For each that part 
-	*	create specified set of features. Save all this features for each part in one file
-	*   (one row for each part)
+	*	Parse specified wav file (create features from wav file). 
+	*	
+	*	Wav file can be any duration. It will be splitted in parts about 'this->wav_split_window_length_' entries
+	*	in each part with 'this->wav_split_window_step_' entries step. For each that part create specified set of features. 
+	*	Save all this features for each part in one file (one row for each part)
 	*/
 
 	try{
@@ -75,20 +80,18 @@ void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const 
 		// set of features for one piece of wav file, as described above)
 		std::ofstream features_result_output(path_to_store_result);
 
-		// Manage loaded channel by pieces of 'wav_split_length' * 2 size
+		// Manage loaded channel by pieces of 'this->wav_split_window_length_' * 2 size
 		// (* 2 because there 16 bits for one sample in wav file)
-		int start_channel_byte = 0;
-		int end_channel_byte = start_channel_byte + wav_split_length * 2;
+		int start_window_byte = 0;
+		int end_window_byte = start_window_byte + this->wav_split_window_length_ * 2;
 	
 		// for each piece of large wav file
-		while(end_channel_byte < size_in_bytes){
-			//std::cout << " * " << start_channel_byte << "\n";
-			
+		while(end_window_byte < size_in_bytes){		
 			// save channel data in file for PythonMfcc class
-			wf.write_first_channel_piece(AuthenticationKernel::TEMP_CHANNEL_OUTPUT_PATH, start_channel_byte, end_channel_byte, false);
+			wf.write_first_channel_piece(AuthenticationKernel::TEMP_CHANNEL_OUTPUT_PATH, start_window_byte, end_window_byte, false);
 		
 			// initialize PythonMfcc api
-			PythonMfcc pm(AuthenticationKernel::TEMP_CHANNEL_OUTPUT_PATH, this->sound_sample_rate_, this->sound_seconds_length_, this->normilize_audio);
+			PythonMfcc pm(AuthenticationKernel::TEMP_CHANNEL_OUTPUT_PATH, this->sound_sample_rate_, this->normilize_audio, this->check_for_silence);
 			
 			// which set of features we want to create
 			switch(type){
@@ -111,9 +114,9 @@ void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const 
 					break;
 			};
 
-			// move wav file piece pointers
-			start_channel_byte = end_channel_byte;
-			end_channel_byte = start_channel_byte + wav_split_length * 2;
+			// move wav file window
+			start_window_byte += this->wav_split_window_step_ * 2;
+			end_window_byte += this->wav_split_window_step_ * 2;
 		}
 	}
 	catch(std::exception& e){
@@ -128,7 +131,7 @@ void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const 
 *	Main interface
 */
 
-void AuthenticationKernel::parse_wav_files(FEATURES type, int wav_split_length){
+void AuthenticationKernel::parse_wav_files(FEATURES type){
 	/*
 	*	Collect all files from specified in constructor folders with legal and not legal voices.
 	*	Parse each file in that folders and save result features in specified folder
@@ -138,8 +141,6 @@ void AuthenticationKernel::parse_wav_files(FEATURES type, int wav_split_length){
 	try{
 		int filename_index = 0;
 		int file_class = 0;
-		double temp_feature = 0.0;
-		std::string temp_buffer = "";
 
 		// folders with wav files to parse
 		std::vector<std::string> folders_to_parse = { 
@@ -163,15 +164,21 @@ void AuthenticationKernel::parse_wav_files(FEATURES type, int wav_split_length){
 					"- Parsing file %1% (%2% of %3%).\n"
 				) % filepath % ++count_files_for_log % list_of_files.size()).str();
 
+				std::string filename = filepath;
+				size_t last_pos = filename.find_last_of("\\/");
+				if (last_pos != std::string::npos){
+				    filename.erase(0, last_pos + 1);
+				}
+
 				// generate output filename for file with calculated features
 				std::string output_filename = (
 					boost::format(
 						"%1%File_%2%_name_%3%_class_%4%.txt"
-					) % this->output_folder_with_all_voices_ % std::to_string(++filename_index) % 123 % file_class
+					) % this->output_folder_with_all_voices_ % std::to_string(++filename_index) % filename % file_class
 				).str();
 
 				// parse current wav file
-				this->parse_wav_file(filepath, output_filename, type, wav_split_length);
+				this->parse_wav_file(filepath, output_filename, type);
 			}
 			++file_class;
 		}
@@ -281,7 +288,7 @@ int AuthenticationKernel::fit(){
 		command += this->path_to_train_;
 		command += " " + this->path_to_test_;
 		command += " " + AuthenticationKernel::TRAINED_MODEL_DUMP_PATH;
-		system(command.c_str());
+		std::system(command.c_str());
 	}
 	catch(std::exception& e){
 		std::cout << "AuthenticationKernel::fit(). Exception while running python script to train nn.\n";
@@ -309,7 +316,7 @@ int AuthenticationKernel::predict(const std::string& filepath_to_predict, const 
 		command += " " + AuthenticationKernel::TRAINED_MODEL_DUMP_PATH;
 		command += " " + path_to_store_result;
 		command += " " + std::to_string(this->normilize_audio);
-		system(command.c_str());
+		std::system(command.c_str());
 	}
 	catch(std::exception& e){
 		std::cout << "AuthenticationKernel::predict(). Exception while running python script to predict nn.\n";
@@ -326,7 +333,7 @@ int AuthenticationKernel::predict_wav(const std::string& path_to_wav, FEATURES t
 	*/
 
 	try{
-		this->parse_wav_file(AuthenticationKernel::MAIN_FOLDER + path_to_wav, AuthenticationKernel::TEST_WAV_FEATURES_PATH, type, 88000);
+		this->parse_wav_file(AuthenticationKernel::MAIN_FOLDER + path_to_wav, AuthenticationKernel::TEST_WAV_FEATURES_PATH, type);
 		this->predict(AuthenticationKernel::TEST_WAV_FEATURES_PATH, AuthenticationKernel::TEST_WAV_PREDICTION_PATH);
 	}
 	catch(std::exception& e){

@@ -11,11 +11,12 @@ int main(int argc, char * argv[]){
 						"  3) nb_mfcc   (int, number of mfcc features)\n"
 						"  4) nb_fbank  (int, number of fbank features)\n"
 						"  5) reparse   ('0' or '1'. Reparse all wav files ot not)\n"
-						"  6) normalize ('0' or '1'. Normilize audio or not)";
+						"  6) normalize ('0' or '1'. Normilize audio or not)\n"
+						"  7) silence   ('0' or '1'. Exclude silence audio parts or not)";
 
 	try{
-		if(argc < 7){
-			std::cout << "NN:  Invalid number of parameters. Need 6 of them.\n" << info;
+		if(argc < 8){
+			std::cout << "NN:  Invalid number of parameters. Need 7 of them.\n" << info;
 			return 1;
 		}
 
@@ -36,7 +37,9 @@ int main(int argc, char * argv[]){
 		bool reparse_wav_files = strcmp(argv[5], "0") == 0 ? false : true;
 		bool normilize_or_not = strcmp(argv[6], "0") == 0 ? false : true;
 		int sound_sample_rate = 44100;
-		int sound_seconds_length = 2;
+		double split_window_length_seconds = 2.0;
+		double split_window_step_seconds = 1.0;
+		bool check_for_silence = strcmp(argv[7], "0") == 0 ? false : true;
 
 		FEATURES features_type;
 		if(strcmp(argv[2], "mfcc") == 0){
@@ -56,8 +59,9 @@ int main(int argc, char * argv[]){
 
 		AuthenticationKernel ak(
 			my_voice_folder, other_voice_folder, output_files_folder,
-			sound_sample_rate, sound_seconds_length, 
-			number_of_mfcc_features, number_of_fbank_features, normilize_or_not
+			int(sound_sample_rate * split_window_length_seconds), int(sound_sample_rate * split_window_step_seconds),
+			sound_sample_rate, number_of_mfcc_features, number_of_fbank_features,
+			normilize_or_not, check_for_silence
 		);
 
 		if(strcmp(argv[1], "train") == 0){

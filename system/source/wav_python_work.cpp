@@ -38,11 +38,11 @@ void PythonMfcc::init_amplitudes_from_file(){
 		}
 
 		delete[] data;
+		inf.close();
 	}
 	else{
 		std::cout << "ChannelFrames::ChannelFrames(const std::string&). Can't open file.\n";
 	}
-	inf.close();
 }
 
 void PythonMfcc::load_python_mfcc_work(const std::string& filepath){
@@ -115,11 +115,11 @@ void PythonMfcc::load_python_fbank_work(const std::string& filepath){
 *	Main interface
 */
 
-PythonMfcc::PythonMfcc(const std::string& amplitudes_filepath, int s_rate, int f_seconds_length, bool normilize)
+PythonMfcc::PythonMfcc(const std::string& amplitudes_filepath, int audio_sample_rate, bool normilize, bool detect_silence)
 	: path_to_channel_amplitudes(amplitudes_filepath)
-	, sample_rate(s_rate)
-	, file_seconds_length(f_seconds_length)
+	, sample_rate(audio_sample_rate)
 	, normilize_audio(normilize)
+	, check_for_silence(detect_silence)
 { 
 	try{
 		this->init_amplitudes_from_file();
@@ -139,17 +139,20 @@ int PythonMfcc::calculate_python_mfcc(int number_of_mfcc_features, const std::st
 	*	 - wav file duration in seconds
 	*	 - number of mfcc features to generate
 	*	 - bool flag: normilize wav audio data ot not
+	*	 - bool flag: delete silence parts of wav or not
 	*/
 
 	try{
-		std::string command = "python " + PythonMfcc::_main_folder + "system/source/py_features.py mfcc ";
+		std::string command = "python " + PythonMfcc::MAIN_FOLDER + "system/source/py_features.py mfcc ";
 		command += this->path_to_channel_amplitudes;
 		command += " " + path_to_store_python_results;
 		command += " " + std::to_string(this->sample_rate);
-		command += " " + std::to_string(this->file_seconds_length);
 		command += " " + std::to_string(number_of_mfcc_features);
 		command += " " + std::to_string(this->normilize_audio);
-		system(command.c_str());
+		command += " " + std::to_string(this->check_for_silence);
+		std::system(command.c_str());
+
+		// std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 	catch(std::exception& e){
 		std::cout << "PythonMfcc::calculate_python_mfcc(). Exception while running python script to calculating mfcc.\n";
@@ -193,15 +196,19 @@ int PythonMfcc::calculate_python_fbank(int number_of_fbank_features, const std::
 	*	 - filepath to store results
 	*	 - wav file audio sample rate
 	*	 - bool flag: normilize wav file data or not
+	*	 - bool flag: delete silence parts of wav or not
 	*/
 
 	try{
-		std::string command = "python " + PythonMfcc::_main_folder + "system/source/py_features.py fbank ";
+		std::string command = "python " + PythonMfcc::MAIN_FOLDER + "system/source/py_features.py fbank ";
 		command += this->path_to_channel_amplitudes;
 		command += " " + path_to_store_python_fbank_results;
 		command += " " + std::to_string(this->sample_rate);
 		command += " " + std::to_string(this->normilize_audio);
-		system(command.c_str());
+		command += " " + std::to_string(this->check_for_silence);
+		std::system(command.c_str());
+
+		// std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
 	catch(std::exception& e){
 		std::cout << "PythonMfcc::calculate_python_fbank(const std::string&). Exception while running python script to calculating fbank.\n";

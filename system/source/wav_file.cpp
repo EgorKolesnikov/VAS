@@ -117,10 +117,8 @@ std::vector<std::vector<char>> WavFile::get_channels() {
 	*	Return data from wav files as vector of channels data.
 	*	Channel is vector of bytes. Data splitted into channels
 	*	as follows: 1 2 3 .. n 1 2 3 ... n 1 2 3 ... n ...
-	*	(where 1 2 3 ... n - in which channel to save byte in current index)
+	*	(where 1 2 3 ... n - in which channel to save byte at current index)
 	*/
-
-	// TODO: use 'int one_channel_tick_length'
 
 	try {
 		int bytes_in_one_channel = this->wav_header.subchunk2_size / this->wav_header.num_channels;
@@ -133,8 +131,10 @@ std::vector<std::vector<char>> WavFile::get_channels() {
 			channels[channel].reserve(bytes_in_one_channel);
 
 			// fill current channels data (step bytes by this->wav_header.num_channels positions)
-			for(int input_byte = 0; input_byte < this->wav_header.subchunk2_size; input_byte += this->wav_header.num_channels){
-				channels[channel].push_back(this->data[input_byte + channel]);
+			for(int input_byte = 0; input_byte < this->wav_header.subchunk2_size; input_byte += this->wav_header.num_channels * one_channel_tick_length){
+				for(int tick = 0; tick < one_channel_tick_length; ++tick){
+					channels[channel].push_back(this->data[input_byte + channel + tick]);
+				}
 			}
 		}
 
@@ -146,37 +146,15 @@ std::vector<std::vector<char>> WavFile::get_channels() {
 	}
 }
 
-void WavFile::write_first_channel(const std::string& destination_file, bool binary){
-	/*
-	*	Saving first channel data (bytes) into destination file.
-	*	If binary = true then result file will be in binary format
-	*	else - destination file will contain bytes splitted by ' '
-	*/
-
-	std::vector<std::vector<char>> channels = this->get_channels();
-	std::ofstream outf(destination_file);
-
-	if(binary){
-		for(int byte_in_channel = 0; byte_in_channel < channels[0].size(); ++byte_in_channel){
-			outf << channels[0][byte_in_channel];
-		}
-	}
-	else{
-		for(int byte_in_channel = 0; byte_in_channel < channels[0].size(); ++byte_in_channel){
-			outf << int(channels[0][byte_in_channel]) << " ";
-		}
-		outf << "\n";
-	}
-	outf.close();
-}
-
 void WavFile::write_first_channel_piece(const std::string& destination_file, int start_index, int end_index, bool binary){
 	/*
 	*	Save specified piece of data bytes into destination_file (same as above).
 	*	Interval of bytes to save is represented through start_index and end_index.
 	*	Note: no checks for segmentation errors.
 	*/
+	
 	std::ofstream outf(destination_file);
+	
 	if(binary){
 		for(int bytes_iterator = start_index; bytes_iterator < end_index; ++bytes_iterator){
 			outf << this->data[bytes_iterator];
@@ -188,7 +166,18 @@ void WavFile::write_first_channel_piece(const std::string& destination_file, int
 		}
 		outf << "\n";
 	}
+	
 	outf.close();
+}
+
+void WavFile::write_first_channel(const std::string& destination_file, bool binary){
+	/*
+	*	Saving first channel data (bytes) into destination file.
+	*	If binary = true then result file will be in binary format
+	*	else - destination file will contain bytes splitted by ' '
+	*/
+
+	this->write_first_channel_piece(destination_file, 0, strlen(this->data), binary);
 }
 
 void WavFile::create_wav(std::string& filename, const WavHeader& wav_header, const std::vector<std::vector<char>>& channels){

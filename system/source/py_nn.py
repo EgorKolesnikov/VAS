@@ -4,7 +4,7 @@ import pandas
 import numpy
 
 
-def create_nn(input_dim_=13):
+def create_nn(input_dim_):
     model = keras.models.Sequential()
     model.add(keras.layers.Dense(64, input_dim=input_dim_, activation='relu'))
     model.add(keras.layers.core.Dropout(0.2))
