@@ -17,8 +17,7 @@ class Recorder:
         self.format = format
         self.listener = pyaudio.PyAudio()
 
-    def record(self, seconds=2):
-        # print 'Recording'
+    def record(self, seconds=5):
         audio_stream = self.listener.open(
             format=self.format, channels=self.channels,
             rate=self.rate, input=True, frames_per_buffer=self.chunk
@@ -52,7 +51,7 @@ class Recorder:
         waveFile.close()
 
 
-def record(seconds=2, return_frames=False):
+def record(seconds=5, return_frames=False):
     recorder = Recorder()
     frames = recorder.record(seconds=seconds)
     recorder.save(frames)

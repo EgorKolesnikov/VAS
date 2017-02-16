@@ -1,34 +1,27 @@
 #include "auth_kernel.h"
+#include "wav_file.cpp"
+
 
 /*
-*	Constructors
+*	Constructor
 */
 
 AuthenticationKernel::AuthenticationKernel(
-	const std::string& wav_my_voice_folder
-	, const std::string& wav_other_voice_folder
-	, const std::string& output_folder
-	, int split_window_length
-	, int split_window_step
-	, int s_rate
-	, int nb_mfcc_features
-	, int nb_fbank_features
-	, bool normilize
-	, bool detect_silence
+	int wav_split_frame_length
+	, int wav_split_frame_step
+	, int sound_sample_rate
+	, int number_of_mfcc_features
+	, int number_of_fbank_features
+	, bool normilize_audio
+	, bool check_for_silence
 )
-	: data_folder_(AuthenticationKernel::MAIN_FOLDER + "data/")
-	, wav_my_voice_folder_(data_folder_ + wav_my_voice_folder)
-	, wav_other_voice_folder_(data_folder_ + wav_other_voice_folder)
-	, output_folder_with_all_voices_(data_folder_ + output_folder)
-	, wav_split_window_length_(split_window_length)
-	, wav_split_window_step_(split_window_step)
-	, sound_sample_rate_(s_rate)
-	, number_of_mfcc_features_(nb_mfcc_features)
-	, number_of_fbank_features_(nb_fbank_features)
-	, path_to_train_(data_folder_ + "nn_data/_train.txt")
-	, path_to_test_(data_folder_ + "nn_data/_test.txt")
-	, normilize_audio(normilize)
-	, check_for_silence(detect_silence)
+	: wav_split_frame_length_(wav_split_frame_length)
+	, wav_split_frame_step_(wav_split_frame_step)
+	, sound_sample_rate_(sound_sample_rate)
+	, number_of_mfcc_features_(number_of_mfcc_features)
+	, number_of_fbank_features_(number_of_fbank_features)
+	, normilize_audio_(normilize_audio)
+	, check_for_silence_(check_for_silence)
 { }
 
 
@@ -36,39 +29,42 @@ AuthenticationKernel::AuthenticationKernel(
 *	Protected utils
 */
 
-std::vector<std::string> AuthenticationKernel::get_list_of_files(const std::string& directory_path){
+
+std::vector<std::string> AuthenticationKernel::get_directory_entries(const std::string& directory_path, bool get_files){
 	/*
-	*	Load list of specified folder files.
+	*	Load list of only files or only directories in specified directory.
 	*	Store them in vector<string>.
 	*/
 
-	std::vector<boost::filesystem::directory_entry> directory_entries;
-	try{
-		std::copy(
-    		boost::filesystem::directory_iterator(directory_path),
-    		boost::filesystem::directory_iterator(), 
-    		std::back_inserter(directory_entries)
-    	);
-	}
-	catch(std::exception& e){
-		std::cout << "AuthenticationKernel::get_list_of_files(const std::string&). Exception while getting list of files.\n";
-		std::cout << e.what() << '\n';
+	std::vector<std::string> directory_entries;
+
+	if(!directory_path.empty()){
+		for(boost::filesystem::directory_iterator entry(directory_path); entry != boost::filesystem::directory_iterator(); ++entry){
+			boost::filesystem::path current_path = (*entry).path();
+			if(get_files == boost::filesystem::is_regular_file(current_path) && current_path.filename().string()[0] != '.'){
+				directory_entries.push_back(boost::filesystem::absolute(current_path).string());
+			}
+		}
 	}
 
-  	std::vector<std::string> list_of_files(directory_entries.size());
-  	for(int i = 0; i < directory_entries.size(); ++i){
-  		list_of_files[i] = directory_entries[i].path().string();
-  	}
-	return list_of_files;
+	return directory_entries;
 }
 
-void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const std::string& path_to_store_result, FEATURES type){
+
+bool AuthenticationKernel::check_wav_file_format(const WavHeader& wav_header){
 	/*
-	*	Parse specified wav file (create features from wav file). 
-	*	
-	*	Wav file can be any duration. It will be splitted in parts about 'this->wav_split_window_length_' entries
-	*	in each part with 'this->wav_split_window_step_' entries step. For each that part create specified set of features. 
-	*	Save all this features for each part in one file (one row for each part)
+	*	Check wav header to have info about correct format: 
+	*	44100 sample rate, 1 channel, 16 bit for one sample
+	*/
+
+	return wav_header.sample_rate == 44100 && wav_header.num_channels == 1 && wav_header.bits_per_sample == 16;
+}
+
+
+void AuthenticationKernel::extract_features_from_wav_file(const std::string& path_to_wav, const std::string& path_to_store_result){
+	/*
+	*	Parse specified wav file (create features from wav file).
+	*	More info in BaseFeatureExtractor and it derivetes?
 	*/
 
 	try{
@@ -76,51 +72,78 @@ void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const 
 		WavFile wf(path_to_wav);
 		int size_in_bytes = wf.get_size_in_bytes();
 
-		// create output file with result features (we will append rows in that file, where one row is
-		// set of features for one piece of wav file, as described above)
-		std::ofstream features_result_output(path_to_store_result);
-
-		// Manage loaded channel by pieces of 'this->wav_split_window_length_' * 2 size
-		// (* 2 because there 16 bits for one sample in wav file)
-		int start_window_byte = 0;
-		int end_window_byte = start_window_byte + this->wav_split_window_length_ * 2;
-	
-		// for each piece of large wav file
-		while(end_window_byte < size_in_bytes){		
-			// save channel data in file for PythonMfcc class
-			wf.write_first_channel_piece(AuthenticationKernel::TEMP_CHANNEL_OUTPUT_PATH, start_window_byte, end_window_byte, false);
-		
-			// initialize PythonMfcc api
-			PythonMfcc pm(AuthenticationKernel::TEMP_CHANNEL_OUTPUT_PATH, this->sound_sample_rate_, this->normilize_audio, this->check_for_silence);
-			
-			// which set of features we want to create
-			switch(type){
-				case FEATURES::MFCC:
-					pm.calculate_python_mfcc(this->number_of_mfcc_features_, AuthenticationKernel::TEMP_PYTHON_MFCC_RESULTS_PATH);
-					pm.complete_python_mfcc_work(AuthenticationKernel::TEMP_PYTHON_MFCC_RESULTS_PATH);
-					pm.append_completed_mfcc_features(features_result_output);
-					break;
-				case FEATURES::FBANK:
-					pm.calculate_python_fbank(this->number_of_fbank_features_, AuthenticationKernel::TEMP_PYTHON_FBANK_RESULTS_PATH);
-					pm.complete_python_fbank_work(AuthenticationKernel::TEMP_PYTHON_FBANK_RESULTS_PATH);
-					pm.append_completed_fbank_features(features_result_output);
-					break;
-				case FEATURES::MFCC_FBANK:
-					pm.calculate_python_mfcc(this->number_of_mfcc_features_, AuthenticationKernel::TEMP_PYTHON_MFCC_RESULTS_PATH);
-					pm.complete_python_mfcc_work(AuthenticationKernel::TEMP_PYTHON_MFCC_RESULTS_PATH);
-					pm.calculate_python_fbank(this->number_of_fbank_features_, AuthenticationKernel::TEMP_PYTHON_FBANK_RESULTS_PATH);
-					pm.complete_python_fbank_work(AuthenticationKernel::TEMP_PYTHON_FBANK_RESULTS_PATH);
-					pm.append_completed_mfcc_and_fbank_features(features_result_output);
-					break;
-			};
-
-			// move wav file window
-			start_window_byte += this->wav_split_window_step_ * 2;
-			end_window_byte += this->wav_split_window_step_ * 2;
+		// check current wav file to have correct format
+		if(!this->check_wav_file_format(wf.get_header())){
+			std::cout << "Wav file " << path_to_wav << " have incorrect format. Skipping.\n";
+			return;
 		}
+
+		// using FeatureExtractors classes to extract features
+		FeaturesCombiner combiner(path_to_wav, path_to_store_result);
+
+		combiner.add<MFCCFeaturesExtractor>(
+			path_to_wav, this->sound_sample_rate_, this->wav_split_frame_length_, this->wav_split_frame_step_, this->number_of_mfcc_features_
+		);
+		combiner.add<FbankFeaturesExtractor>(
+			path_to_wav, this->sound_sample_rate_, this->wav_split_frame_length_, this->wav_split_frame_step_, this->number_of_fbank_features_
+		);
+
+		combiner.combine();
 	}
 	catch(std::exception& e){
 		std::cout << "void AuthenticationKernel::parse_wav_file(...). Exception while parsing wav file.\n";
+		std::cout << e.what() << '\n';
+	}
+}
+
+
+std::vector<std::pair<int, std::vector<double>>> AuthenticationKernel::load_parsed_files(){
+	/*
+	*	Load extracted features from all wav files. Folder with features: SETTINGS::WAV_FILES_FEATURES_FOLDER
+	*	SETTINGS::WAV_FILES_FEATURES_FOLDER folder has same structure as SETTINGS::WAV_FILES_FOLDER
+	*	(but except of wav files there are features for those wav files)
+	*/
+
+	try{
+		// load all filenames, which contain features for each parsed wav file (one special folder for that files)
+		std::vector<std::string> list_of_folders = this->get_directory_entries(SETTINGS::WAV_FILES_FEATURES_FOLDER, false);
+
+		// here store features for all files, pair(A, B) - features=B, class_of_file=A
+		std::vector<std::pair<int, std::vector<double>>> whole_sample;
+
+		for(const std::string& folder_path : list_of_folders){
+			// get current folder voice class from current folder filename (folder name format described in this->extract_features())
+			int current_folder_voice_class = std::stoi(
+				std::string(folder_path.begin() + folder_path.find_last_of("_") + 1, folder_path.end())
+			);
+			
+			for(const std::string& file_path : this->get_directory_entries(folder_path, true)){
+				std::ifstream inf(file_path);
+				std::string temp_buffer;
+
+				// extracting file data line by line
+				while (std::getline(inf, temp_buffer)){
+					std::istringstream iss(temp_buffer);
+					std::vector<double> one_frame_features;
+
+					// read features for one train or test sample element (line of file)
+					double temp_feature;
+					while (iss >> temp_feature) { 
+						one_frame_features.push_back(temp_feature); 
+					}
+
+					// save one string of features as one entry of whole sample
+					whole_sample.push_back(std::make_pair(current_folder_voice_class, one_frame_features));
+				}
+
+				inf.close();
+			}
+		}
+
+		return whole_sample;
+	}
+	catch(std::exception& e){
+		std::cout << "void AuthenticationKernel::load_parsed_files(...). Exception while loading parsed wav files.\n";
 		std::cout << e.what() << '\n';
 	}
 }
@@ -131,119 +154,94 @@ void AuthenticationKernel::parse_wav_file(const std::string& path_to_wav, const 
 *	Main interface
 */
 
-void AuthenticationKernel::parse_wav_files(FEATURES type){
+void AuthenticationKernel::extract_features(){
 	/*
-	*	Collect all files from specified in constructor folders with legal and not legal voices.
-	*	Parse each file in that folders and save result features in specified folder
-	*	(one file with features for one wav file)
+	*	Collect all files from specified in constructor folders. Each folder should be 
+	*	in following format:	
+	*		'voice_$_#', where
+	*		 - $ - any string (describing voice in folder)
+	*		 - # - class of voice (number from 0 to infty). Classes are unique for different voices
+	*	
+	*	Creating same folders in result folder with features. Store in that newly created folders
+	*	features, extracted from each folder. (one file with features for one wav file)
 	*/
 
 	try{
-		int filename_index = 0;
-		int file_class = 0;
-
 		// folders with wav files to parse
-		std::vector<std::string> folders_to_parse = { 
-			this->wav_other_voice_folder_, 
-			this->wav_my_voice_folder_ 
-		};
+		std::vector<std::string> folders_to_parse = this->get_directory_entries(SETTINGS::WAV_FILES_FOLDER, false);
 		
-		// parse each folder separately (so we know that in one of them legal and in another - illegal voices)
-		// with that knowledge it is easier to set label (class for classification) for each voice sample
+		// parse each folder separately
 		for(std::string& folder : folders_to_parse){
 			// load filenames from current folder
-			std::cout << (boost::format("Parsing folder %1%\n") % folder).str();
-			std::vector<std::string> list_of_files = this->get_list_of_files(folder);
-			std::cout << (boost::format("In folder %1% found %2% files.\n") % folder % list_of_files.size()).str();
+			std::cout << "Parsing folder " << folder << "\n";
+			std::vector<std::string> list_of_files = this->get_directory_entries(folder, true);
+			std::cout << "In folder " << folder << " found " << list_of_files.size() << " files.\n";
+
+			// get directory name and create same directory in folder with features (see mode in SETTINGS::)
+			std::string output_directory_name(folder.begin() + folder.find_last_of("\\/") + 1, folder.end());
+			if(!boost::filesystem::create_directory(SETTINGS::WAV_FILES_FEATURES_FOLDER + output_directory_name)){
+				std::cout << "Can not create directory " + SETTINGS::WAV_FILES_FEATURES_FOLDER + output_directory_name << "\n";
+				throw std::exception();
+			}
 			
 			int count_files_for_log = 0;
 
 			// parse each file separately
 			for(std::string& filepath : list_of_files){
-				std::cout << (boost::format(
-					"- Parsing file %1% (%2% of %3%).\n"
-				) % filepath % ++count_files_for_log % list_of_files.size()).str();
+				std::cout << "- Parsing file " << filepath << "(" << ++count_files_for_log << " of " << list_of_files.size() << ").\n";
 
-				std::string filename = filepath;
-				size_t last_pos = filename.find_last_of("\\/");
-				if (last_pos != std::string::npos){
-				    filename.erase(0, last_pos + 1);
-				}
+				// get only wav file name (without path and extension)
+				std::string filename(filepath.begin() + filepath.find_last_of("\\/") + 1, filepath.begin() + filepath.find_last_of("."));
 
 				// generate output filename for file with calculated features
-				std::string output_filename = (
-					boost::format(
-						"%1%File_%2%_name_%3%_class_%4%.txt"
-					) % this->output_folder_with_all_voices_ % std::to_string(++filename_index) % filename % file_class
-				).str();
+				std::string output_filepath = SETTINGS::WAV_FILES_FEATURES_FOLDER + output_directory_name + "/" + filename + ".features";
 
 				// parse current wav file
-				this->parse_wav_file(filepath, output_filename, type);
+				this->extract_features_from_wav_file(filepath, output_filepath);
 			}
-			++file_class;
 		}
 	}
 	catch(std::exception& e){
-		std::cout << "void AuthenticationKernel::parse_wav_files(...). Exception while parsing wav files.\n";
+		std::cout << "void AuthenticationKernel::extract_features(...). Exception while parsing wav files.\n";
 		std::cout << e.what() << '\n';
 	}
 }
 
-void AuthenticationKernel::create_train_test(double train_size){
+void AuthenticationKernel::create_train_test(const std::string& folder_to_save, bool one_vs_all, int main_class, double train_size){
 	/*
-	*	Using parsed folders with wav files (for more info see void AuthenticationKernel::parse_wav_files(...))
-	*	to create train and test samples for neural network. (Shuffle loaded samples and then split them)
+	*	Using extracted before wav files features to create test and train samples.
+	*	Can create one_vs_all (with 2 classes) train and test, or just leave many classes.
 	*	Size of train is specified through 'double train_size' (range from 0 to 1) 
 	*/
+
 	try{
-		// load all filenames, which contain features for each parsed wav file (one special folder for that files)
-		std::vector<std::string> list_of_files = this->get_list_of_files(this->output_folder_with_all_voices_);
-		std::vector<std::pair<int, std::vector<double>>> whole_sample;
+		std::cout << "\nCreating train, test for model with description: " << folder_to_save << "\n";
+		std::vector<std::pair<int, std::vector<double>>> whole_sample = this->load_parsed_files();
 
-		std::string temp_buffer = "";
-		std::vector<std::string> temp_filename_tokens;
-		double temp_feature = 0.0;
-		int file_class = 0;
-		int count_sample_entries = 0;
-
-		// manage each file separately (note: for large wav files there may be a lot 
-		// train and test samples in one files with features [as discussed earlier:
-		// one line of features for one train or test sample])
-		for(std::string& filepath : list_of_files){
-			std::ifstream inf(filepath);
-
-			// parse filaname to findout file class
-			boost::split(temp_filename_tokens, filepath, boost::is_any_of("\\_."));
-			file_class = std::stoi(temp_filename_tokens[temp_filename_tokens.size() - 2]);
-
-			// get file data
-			while (std::getline(inf, temp_buffer)){
-				std::istringstream iss(temp_buffer);
-				std::vector<double> one_piece_features;
-
-				// read features for one train or test sample element
-				while (iss >> temp_feature) { 
-					one_piece_features.push_back(temp_feature); 
+		// if we want one vs all training - reassign classes to frames (main_frame - class 1, else - 0)
+		if(one_vs_all){
+			for(auto& frame : whole_sample){
+				if(frame.first == main_class){
+					frame.first = 1;
 				}
-
-				// save one string of features as one entry of whole sample
-				whole_sample.push_back(std::make_pair(file_class, one_piece_features));
+				else{
+					frame.first = 0;
+				}
 			}
-
-			inf.close();
 		}
 
-		// saving sample data and split in train, test if necessary
+		std::cout << "Total found " << whole_sample.size() << " samples (both in train and test)\n";
+
 		std::shuffle(
 			std::begin(whole_sample), std::end(whole_sample),
 			std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count())
 		);
 
 		int record_index = 0;
-		std::ofstream outf_train(this->path_to_train_);
-		std::ofstream outf_test(this->path_to_test_);
+		std::ofstream outf_train(folder_to_save + "/" + SETTINGS::TRAIN_OUTPUT_NAME);
+		std::ofstream outf_test(folder_to_save + "/" + SETTINGS::TEST_OUTPUT_NAME);
 
-		// train
+		// saving train part
 		outf_train << "Class,Features\n";
 		for(record_index = 0; record_index < whole_sample.size() * train_size; ++record_index){
 			outf_train << whole_sample[record_index].first << ",";
@@ -253,7 +251,7 @@ void AuthenticationKernel::create_train_test(double train_size){
 			outf_train << "\n";
 		}
 
-		// test
+		// saving test part
 		outf_test << "Class,Features\n";
 		for( ; record_index < whole_sample.size(); ++record_index){
 			outf_test << whole_sample[record_index].first << ",";
@@ -267,79 +265,64 @@ void AuthenticationKernel::create_train_test(double train_size){
 		outf_test.close();
 	}
 	catch(std::exception& e){
-		std::cout << "void AuthenticationKernel::create_train_test(double). Exception while creating train and test.\n";
+		std::cout << "void AuthenticationKernel::create_train_test(...). Exception while creating train and test.\n";
+		std::cout << e.what() << '\n';
 	}
 }
 
 
-int AuthenticationKernel::fit(){
+int AuthenticationKernel::fit(const std::string& model_folder){
 	/*
 	*	Run python script to train neural network (and save dump to specified location)
 	*	Parameters:
-	*	 - mode (fit or predict)
+	*	 - mode (fit or predict. Here - fit)
 	*	 - path to file with train data
 	*	 - path to file with test data
-	*	 - path to save dump file
-	*	 - number of features for one wav file
+	*	 - path to save trained model dump
+	*	 - path to file to write training and testing scores to
 	*/
 
 	try{
-		std::string command = "python " + AuthenticationKernel::MAIN_FOLDER + "system/source/py_nn.py fit ";
-		command += this->path_to_train_;
-		command += " " + this->path_to_test_;
-		command += " " + AuthenticationKernel::TRAINED_MODEL_DUMP_PATH;
+		std::string command = "python " + SETTINGS::PYTHON_MODEL_TRAINING_SCRIPT_PATH + " fit";
+		command += " " + model_folder + "/" + SETTINGS::TRAIN_OUTPUT_NAME;
+		command += " " + model_folder + "/" + SETTINGS::TEST_OUTPUT_NAME;
+		command += " " + model_folder + "/" + SETTINGS::MODEL_DUMP_OUTPUT_NAME;
+		command += " " + model_folder + "/" + SETTINGS::MODEL_TRAIN_TEST_SCORE_INFO_NAME;
 		std::system(command.c_str());
 	}
 	catch(std::exception& e){
-		std::cout << "AuthenticationKernel::fit(). Exception while running python script to train nn.\n";
+		std::cout << "void AuthenticationKernel::fit(). Exception while training model.\n";
 		std::cout << e.what() << '\n';
-		return 1;
 	}
-	return 0;
 }
 
 
-int AuthenticationKernel::predict(const std::string& filepath_to_predict, const std::string& path_to_store_result){
+int AuthenticationKernel::predict(const std::string& model_folder){
 	/*
-	*	Run python script to predict class of last recorded voice sample.
-	*	Parameters:
-	*	 - mode (fit or predict)
-	*	 - path to wav file features for prediction
-	*	 - path to neural network dump
+	*	Predict class for current wav file. It has been already recorded. saved in specified in SETTINGS
+	*	folder. Need to extract_features and run python script, which will load specified model dump
+	*	(there may be many of them, while testing for example).
+	*	
+	*	Parameters for python script:
+	*	 - mode (fit or predict. Here - predict)
+	*	 - path to current file saved features
+	*	 - path to saved trained model dump
 	*	 - path to store prediction results
-	*	 - bool flag: normilize audio or not
 	*/
 
 	try{
-		std::string command = "python " + AuthenticationKernel::MAIN_FOLDER + "system/source/py_nn.py predict ";
-		command += filepath_to_predict;
-		command += " " + AuthenticationKernel::TRAINED_MODEL_DUMP_PATH;
-		command += " " + path_to_store_result;
-		command += " " + std::to_string(this->normilize_audio);
+		// first we need to parse latest recorded wav file
+		this->extract_features_from_wav_file(SETTINGS::TEST_WAV_FILE_SAVE_PATH, SETTINGS::TEST_WAV_FEATURES_PATH);
+
+		// running python script and saving prediction results
+		std::string command = "python " + SETTINGS::PYTHON_MODEL_TRAINING_SCRIPT_PATH + " predict";
+		command += " " + SETTINGS::TEST_WAV_FEATURES_PATH;
+		command += " " + model_folder + "/" + SETTINGS::MODEL_DUMP_OUTPUT_NAME;
+		command += " " + SETTINGS::TEST_WAV_PREDICTION_PATH;
 		std::system(command.c_str());
 	}
 	catch(std::exception& e){
-		std::cout << "AuthenticationKernel::predict(). Exception while running python script to predict nn.\n";
+		std::cout << "void AuthenticationKernel::fit(). Exception while predicting current recorded voice class.\n";
 		std::cout << e.what() << '\n';
-		return 1;
 	}
-	return 0;
-}
-
-int AuthenticationKernel::predict_wav(const std::string& path_to_wav, FEATURES type){
-	/*
-	*	Prepare (parse) last recorded wav file to be proceeded in neural network for prediction.
-	*	(parse wav file and then predict)
-	*/
-
-	try{
-		this->parse_wav_file(AuthenticationKernel::MAIN_FOLDER + path_to_wav, AuthenticationKernel::TEST_WAV_FEATURES_PATH, type);
-		this->predict(AuthenticationKernel::TEST_WAV_FEATURES_PATH, AuthenticationKernel::TEST_WAV_PREDICTION_PATH);
-	}
-	catch(std::exception& e){
-		std::cout << "int AuthenticationKernel::predict_wav(const std::string&). Exception while predicting wav file.\n";
-		std::cout << e.what() << '\n';
-		return 1;
-	}
-	return 0;
 }

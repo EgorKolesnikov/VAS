@@ -1,82 +1,107 @@
-#include "source/include_all.h"
+#include "source/include.h"
 
 //
 //	For specific bash script usage only
 //
 
+
+std::string generate_model_folder_path(bool one_vs_all, int main_voice_class){
+	/*
+	*	Generating model folder path in following format:
+	*	$1[__$2], where:
+	*	 - $1: type of model training. One of ['one_vs_all', 'multiclass']
+	*	 - $2: optional (if $1 == 'one_vs_all'). Contains class unique id (number >= 0)
+	*/
+
+	if(one_vs_all){
+		return "one_vs_all__main_voice__" + std::to_string(main_voice_class);
+	}
+	else{
+		return "multiclass";
+	}
+}
+
+
+void clear_folders_for_features(){
+	if(boost::filesystem::exists(SETTINGS::WAV_FILES_FEATURES_FOLDER)){
+		boost::filesystem::remove_all(SETTINGS::WAV_FILES_FEATURES_FOLDER);
+	}
+	boost::filesystem::create_directory(SETTINGS::WAV_FILES_FEATURES_FOLDER);
+} 
+
+
 int main(int argc, char * argv[]){
 	std::string info = 	"Parameters:\n"
-						"  1) mode      ('train' or 'test')\n"
-						"  2) features  ('mfcc', 'fbank', 'both')\n"
-						"  3) nb_mfcc   (int, number of mfcc features)\n"
-						"  4) nb_fbank  (int, number of fbank features)\n"
-						"  5) reparse   ('0' or '1'. Reparse all wav files ot not)\n"
-						"  6) normalize ('0' or '1'. Normilize audio or not)\n"
-						"  7) silence   ('0' or '1'. Exclude silence audio parts or not)";
+						"  1)  mode      		('train' or 'test')\n"
+						"  2)  nb_mfcc   		(int, number of mfcc features)\n"
+						"  3)  nb_fbank  		(int, number of fbank features)\n"
+						"  4)  reparse   		('0' or '1'. Reparse all wav files ot not)\n"
+						"  5)  normalize 		('0' or '1'. Normilize audio or not)\n"
+						"  6)  silence   		('0' or '1'. Exclude silence audio parts or not)\n"
+						"  7)  frame_window		(length of frame window for wav files parse)\n"
+						"  8)  frame_step		(length of frame step for wav files parse)\n"
+						"  9)  one-vs-all		('0' or '1'. Train model in one-vs-all mode or not)\n"
+						"  10) main_voice_class	(number of main class (voice id) in one-vs-all train mode)\n";
 
 	try{
-		if(argc < 8){
-			std::cout << "NN:  Invalid number of parameters. Need 7 of them.\n" << info;
+		if(argc != 11){
+			std::cout << "NN:  Invalid number of parameters. Need 10 of them.\n" << info;
 			return 1;
 		}
-
 		
-		/*
-		*	Declare system variables. Don't touch string constants (they should be the save as in auth kernel)
-		*/
-		
-		std::string my_voice_folder = "wav_files/wav_my_voice/";
-		std::string other_voice_folder = "wav_files/wav_other_voice/";
-		std::string output_files_folder = "wav_files_features/";
-		std::string filepath_to_predict_features = "../data/nn_data/last_recorded_wav_features.txt";
-		std::string filepath_to_store_result = "../data/nn_data/last_recorded_wav_prediction.txt";
-		std::string filepath_to_store_testing_wav = "/data/recorded.wav";
-
-		int number_of_mfcc_features = std::stoi(argv[3]);
-		int number_of_fbank_features = std::stoi(argv[4]);
-		bool reparse_wav_files = strcmp(argv[5], "0") == 0 ? false : true;
-		bool normilize_or_not = strcmp(argv[6], "0") == 0 ? false : true;
 		int sound_sample_rate = 44100;
-		double split_window_length_seconds = 2.0;
-		double split_window_step_seconds = 1.0;
-		bool check_for_silence = strcmp(argv[7], "0") == 0 ? false : true;
 
-		FEATURES features_type;
-		if(strcmp(argv[2], "mfcc") == 0){
-			features_type = FEATURES::MFCC;
-		}
-		else if(strcmp(argv[2], "fbank") == 0){
-			features_type = FEATURES::FBANK;
-		}
-		else{
-			features_type = FEATURES::MFCC_FBANK;
-		}
+
+		/*
+		*	Parse parameters
+		*/
+
+		bool train_mode = (strcmp(argv[1], "train") == 0);
+		int number_of_mfcc_features = std::stoi(argv[2]);
+		int number_of_fbank_features = std::stoi(argv[3]);
+		bool reparse_wav_files = strcmp(argv[4], "0") == 0 ? false : true;
+		bool normilize_or_not = strcmp(argv[5], "0") == 0 ? false : true;
+		bool check_for_silence = strcmp(argv[6], "0") == 0 ? false : true;
+		double split_window_length_seconds = std::stof(argv[7]);
+		double split_window_step_seconds = std::stof(argv[8]);
+		bool one_vs_all = strcmp(argv[9], "0") == 0 ? false : true;
+		int main_voice_class = std::stoi(argv[10]);
 
 		
 		/*
 		*	Run authentication system
 		*/
 
-		AuthenticationKernel ak(
-			my_voice_folder, other_voice_folder, output_files_folder,
-			int(sound_sample_rate * split_window_length_seconds), int(sound_sample_rate * split_window_step_seconds),
-			sound_sample_rate, number_of_mfcc_features, number_of_fbank_features,
-			normilize_or_not, check_for_silence
+		// initializing kernel
+		AuthenticationKernel ak(			
+			int(sound_sample_rate * split_window_length_seconds)
+			, int(sound_sample_rate * split_window_step_seconds)
+			, sound_sample_rate
+			, number_of_mfcc_features
+			, number_of_fbank_features
+			, normilize_or_not
+			, check_for_silence
 		);
 
-		if(strcmp(argv[1], "train") == 0){
+		// init current model directory
+		std::string model_folder_path = SETTINGS::TRAINED_MODELS_DUMPS_FOLDER + generate_model_folder_path(one_vs_all, main_voice_class);
+		boost::filesystem::create_directory(model_folder_path);
+
+		if(train_mode){
 			if(reparse_wav_files){
-				ak.parse_wav_files(features_type);
+				clear_folders_for_features();
+
+				ak.extract_features();
 			}
-			ak.create_train_test();
-			ak.fit();
+			ak.create_train_test(model_folder_path, one_vs_all, main_voice_class);
+			ak.fit(model_folder_path);
 		}
 		else{
-			ak.predict_wav(filepath_to_store_testing_wav, features_type);
+			ak.predict(model_folder_path);
 		}
 	}
 	catch(std::exception& e){
-		std::cout << "Error.\n";
+		std::cout << "Error. Just error. Deal with it. \n";
 	}
 
 	std::cout << std::endl;
