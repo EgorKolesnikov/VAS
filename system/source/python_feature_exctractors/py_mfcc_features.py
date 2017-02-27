@@ -4,14 +4,24 @@ from python_speech_features import mfcc
 from utilities import get_wav_amplitudes, silence
 
 
-def run_python_mfcc(path_to_wav_file, path_to_output_features, sample_rate, frame_length, frame_step, number_of_mfcc_features, check_silence=False):
+def run_python_mfcc(
+    path_to_wav_file
+    , path_to_output_features
+    , sample_rate
+    , frame_length
+    , frame_step
+    , number_of_mfcc_features
+    , normilize=True
+):
+    # prepare parameters
     sample_rate = int(sample_rate)
     frame_length = int(frame_length)
     frame_step = int(frame_step)
     number_of_mfcc_features = int(number_of_mfcc_features)
+    normilize = True if normilize == '1' else False
 
     # extract wav file amplitude values
-    amplitudes = get_wav_amplitudes(path_to_wav_file)
+    amplitudes = get_wav_amplitudes(path_to_wav_file, normilize)
 
     # init iteration
     frames_features = mfcc(

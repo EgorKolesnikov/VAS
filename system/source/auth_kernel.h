@@ -40,7 +40,6 @@ private:
 	int number_of_mfcc_features_;			// number of mfcc coeffs to create for each wav file
 	int number_of_fbank_features_;			// number of fbank coeffs to create for each wav file
 	bool normilize_audio_;					// normilize audio files or not
-	bool check_for_silence_;				// parse and train only on not silence wav file pieces
 
 
 protected:
@@ -67,7 +66,6 @@ public:
 		, int number_of_mfcc_features
 		, int number_of_fbank_features
 		, bool normilize_audio = false
-		, bool check_for_silence = false
 	);
 
 	// extract features from all wav files (from folders specified in SETTINGS::)

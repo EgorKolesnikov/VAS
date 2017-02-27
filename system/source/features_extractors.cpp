@@ -12,11 +12,13 @@ BaseFeaturesExtractor::BaseFeaturesExtractor(
 	, int sample_rate
 	, int frame_length
 	, int frame_shift
+	, bool normilize_audio
 ) 
 	: path_to_wav_file_(path_to_wav_file)
 	, sample_rate_(sample_rate)
 	, frame_length_(frame_length)
 	, frame_shift_(frame_shift)
+	, normilize_audio_(normilize_audio)
 { }
 
 
@@ -96,12 +98,14 @@ MFCCFeaturesExtractor::MFCCFeaturesExtractor(
 	, int frame_length
 	, int frame_shift
 	, int number_of_mfcc_features
+	, bool normilize_audio
 ) :
 	BaseFeaturesExtractor(
 		path_to_wav_file
 		, sample_rate
 		, frame_length
 		, frame_shift
+		, normilize_audio
 	)
 	, number_of_mfcc_features_(number_of_mfcc_features)
 { }
@@ -123,6 +127,7 @@ void MFCCFeaturesExtractor::extract(){
 				, std::to_string(this->frame_length_)
 				, std::to_string(this->frame_shift_)
 				, std::to_string(this->number_of_mfcc_features_)
+				, std::to_string(this->normilize_audio_)
 			}
 		);
 
@@ -148,12 +153,14 @@ FbankFeaturesExtractor::FbankFeaturesExtractor(
 	, int frame_length
 	, int frame_shift
 	, int number_of_fbank_features
+	, bool normilize_audio
 ) :
 	BaseFeaturesExtractor(
 		path_to_wav_file
 		, sample_rate
 		, frame_length
 		, frame_shift
+		, normilize_audio
 	)
 	, number_of_fbank_features_(number_of_fbank_features)
 { }
@@ -174,6 +181,7 @@ void FbankFeaturesExtractor::extract(){
 				, std::to_string(this->frame_length_)
 				, std::to_string(this->frame_shift_)
 				, std::to_string(this->number_of_fbank_features_)
+				, std::to_string(this->normilize_audio_)
 			}
 		);
 

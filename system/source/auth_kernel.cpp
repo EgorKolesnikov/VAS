@@ -13,7 +13,6 @@ AuthenticationKernel::AuthenticationKernel(
 	, int number_of_mfcc_features
 	, int number_of_fbank_features
 	, bool normilize_audio
-	, bool check_for_silence
 )
 	: wav_split_frame_length_(wav_split_frame_length)
 	, wav_split_frame_step_(wav_split_frame_step)
@@ -21,7 +20,6 @@ AuthenticationKernel::AuthenticationKernel(
 	, number_of_mfcc_features_(number_of_mfcc_features)
 	, number_of_fbank_features_(number_of_fbank_features)
 	, normilize_audio_(normilize_audio)
-	, check_for_silence_(check_for_silence)
 { }
 
 
@@ -82,10 +80,10 @@ void AuthenticationKernel::extract_features_from_wav_file(const std::string& pat
 		FeaturesCombiner combiner(path_to_wav, path_to_store_result);
 
 		combiner.add<MFCCFeaturesExtractor>(
-			path_to_wav, this->sound_sample_rate_, this->wav_split_frame_length_, this->wav_split_frame_step_, this->number_of_mfcc_features_
+			path_to_wav, this->sound_sample_rate_, this->wav_split_frame_length_, this->wav_split_frame_step_, this->number_of_mfcc_features_, this->normilize_audio_
 		);
 		combiner.add<FbankFeaturesExtractor>(
-			path_to_wav, this->sound_sample_rate_, this->wav_split_frame_length_, this->wav_split_frame_step_, this->number_of_fbank_features_
+			path_to_wav, this->sound_sample_rate_, this->wav_split_frame_length_, this->wav_split_frame_step_, this->number_of_fbank_features_, this->normilize_audio_
 		);
 
 		combiner.combine();

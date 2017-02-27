@@ -4,18 +4,19 @@
 
 usage_help="
    -r, --recompile          [Default: false]    : if we want to recompile all source or not.
-   -m, --mode=...           [Default: test]     : 'train' or 'test'
+   -m, --mode=...           [Default: none]     : 'train' or 'test' (or 'none')
    --nb-mfcc=...            [Default: 13]       : number of mfcc coefficients (int).
    --nb-fbank=...           [Default: 26]       : number of filterbanks (int).
    --reparse-wav            [Default: false]    : if we want to reparse all wav files (for train).
    -n, --norm               [Default: false]    : normilize audio file or not.
-   -s, --silence            [Default: false]    : do not work with silence parts of wav file.
    --frame-window=...       [Default: 2.0]      : frame window in seconds to create train and test.
    --frame-step=...         [Default: 1.0]      : frame step in seconds to create train and test.
    --one-vs-all             [Default: false]    : whether or not we want to train model in one-vs-all mode. 
                                                   No impact if mode=test
    --main-voice-class=...   [Default: 1]        : main class (one of voice unique ids) in one-vs-all train mode. 
-                                                  No impact if --one-vs-all was not specified 
+                                                  No impact if --one-vs-all was not specified
+   -lc, --load-config		[Default: 1]		: load config files to initialize all variables. Loading after all
+   												  other parameters parsed. Be sure not to rewrite parameters.
 "
 
 #################################################################################################################
@@ -62,6 +63,32 @@ function check_number_parameter(){
     parameters[$1]="$2"
 }
 
+function load_config_file(){
+	# Loading configuration file 'config.conf', where all parameters stored in format:
+	# 'key=value'. Reading these key value entries and overwrite existing parameters
+	
+	IFS="="
+	while read -r name value
+	do
+		parameters["$name"]=$value
+	done < 'config.conf'
+}
+
+function run_program_with_parameters(){
+	# Running auth system with specified parameters
+	# (all parameters should be specified by now)
+	$main_interface_folder$output_executable_name \
+        ${parameters[mode]} \
+        ${parameters[nb_mfcc]} \
+        ${parameters[nb_fbank]} \
+        ${parameters[reparse_wav]} \
+        ${parameters[norm]} \
+        ${parameters[frame_window]} \
+        ${parameters[frame_step]} \
+        ${parameters[one_vs_all]} \
+        ${parameters[main_voice_class]}
+}
+
 
 #
 #   Util variables
@@ -70,20 +97,21 @@ function check_number_parameter(){
 # storage for all parameters
 declare -A parameters
 
-# assign default parameters values
+# assign default parameters values (most accurate parameters for testing mode)
 parameters[recompile]=0
 parameters[mode]="test"
 parameters[nb_mfcc]=13
 parameters[nb_fbank]=26
 parameters[reparse_wav]=0
-parameters[norm]=0
-parameters[silence]=0
+parameters[norm]=1
 parameters[frame_window]=2.0
 parameters[frame_step]=1.0
-parameters[one_vs_all]=0
+parameters[one_vs_all]=1
 parameters[main_voice_class]=1
+parameters[load_config]=0
 
-# declare some paths to be able to run scripts and etc (NOTE: need to sync with settings.h)
+# declare some paths to be able to run scripts and etc 
+# (NOTE: need to sync with settings.h)
 path_to_script="/home/kolegor/Code/VAS/"
 main_interface_folder=$path_to_script"system/"
 source_folder=$main_interface"source/"
@@ -122,9 +150,6 @@ while :; do
         -n|--norm)
             parameters[norm]=1
             ;;
-        -s|--silence)
-            parameters[silence]=1
-            ;;
         --frame-window=?*|--frame-window=)
             check_number_parameter "frame_window" ${1#*=}
             ;;
@@ -137,6 +162,9 @@ while :; do
         --main-voice-class=?*|--main-voice-class=)
             check_number_parameter "main_voice_class" ${1#*=}
             ;;
+        -lc|--load-config)
+            parameters[load_config]=1
+            ;;
         -?*)
             printf "ERROR: Unknown option: $1\n"
             exit
@@ -146,6 +174,13 @@ while :; do
     esac
     shift
 done
+
+
+#	Loading configuration file if we want to
+if [[ ${parameters[load_config]} == 1 ]]; then
+	echo 'SYS. Loading parameters from config file'
+	load_config_file
+fi
 
 
 #
@@ -162,19 +197,7 @@ if [[ ${parameters[recompile]} == 1 ]]; then
 fi
 
 # train or test out system
-if [[ ${parameters[mode]} == "train" ]]; then
-    $main_interface_folder$output_executable_name \
-        ${parameters[mode]} \
-        ${parameters[nb_mfcc]} \
-        ${parameters[nb_fbank]} \
-        ${parameters[reparse_wav]} \
-        ${parameters[norm]} \
-        ${parameters[silence]} \
-        ${parameters[frame_window]} \
-        ${parameters[frame_step]} \
-        ${parameters[one_vs_all]} \
-        ${parameters[main_voice_class]}
-else
+if [[ ${parameters[mode]} == "test" ]]; then
     # Prepare user for recording
     printf "SYS: You will have 5 seconds to record your voice. Recording will start in\n"
     sleep 3
@@ -183,18 +206,8 @@ else
     (python "$main_interface_folder"wav_record.py "data/recorded.wav")
 
     # Run nn classification
-    printf "\nSYS: Running neural network to classify your voice.\n"
-    $main_interface_folder$output_executable_name \
-        ${parameters[mode]} \
-        ${parameters[nb_mfcc]} \
-        ${parameters[nb_fbank]} \
-        ${parameters[reparse_wav]} \
-        ${parameters[norm]} \
-        ${parameters[silence]} \
-        ${parameters[frame_window]} \
-        ${parameters[frame_step]} \
-        ${parameters[one_vs_all]} \
-        ${parameters[main_voice_class]}
+    printf "\nSYS: Request to authentication system kernel to classify your voice.\n"
+    run_program_with_parameters
 
     # Check the results
     read -d $'\x04' name < "$classification_result_file"
@@ -203,4 +216,6 @@ else
     else
         echo "Welcome, master Egor!"
     fi
+else
+	run_program_with_parameters
 fi

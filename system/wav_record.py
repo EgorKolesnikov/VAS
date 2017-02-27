@@ -36,13 +36,7 @@ class Recorder:
         print 'Done recording.'
         return frames
 
-    def save(self, frames, filename='recorded.wav'):
-        filepath_to_save = ''
-        if len(sys.argv) > 1:
-            filepath_to_save = sys.argv[1]
-        else:
-            filepath_to_save = 'recorded.wav' + '_' + str(datetime.now());
-        
+    def save(self, frames, filepath_to_save='/home/kolegor/Code/VAS/data/_last_recorded.wav'):        
         waveFile = wave.open(filepath_to_save, 'wb')
         waveFile.setnchannels(self.channels)
         waveFile.setframerate(self.rate)

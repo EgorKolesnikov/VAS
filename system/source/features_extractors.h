@@ -53,6 +53,7 @@ protected:
 	int sample_rate_;											// sample rate of input audio
 	int frame_length_;											// length of audio file in samples to extract features for
 	int frame_shift_;											// move each frame window in that specified number of samples
+	bool normilize_audio_;										// whether or not we want to normilize input wav files
 
 	std::vector<std::vector<double>> frames_features_;			// storage to save features for each frame
 
@@ -70,6 +71,7 @@ public:
 		, int sample_rate
 		, int frame_length
 		, int frame_shift
+		, bool normilize_audio
 	);
 
 	// main function for feature extraction
@@ -104,6 +106,7 @@ public:
 		, int frame_length
 		, int frame_shift
 		, int number_of_mfcc_features
+		, bool normilize_wav
 	);
 
 	// main method to extract MFCC features (for now using python script)
@@ -135,6 +138,7 @@ public:
 		, int frame_length
 		, int frame_shift
 		, int number_of_fbank_features
+		, bool normilize_wav
 	);
 
 	// main method to extract Fbank features (for now using python script)
