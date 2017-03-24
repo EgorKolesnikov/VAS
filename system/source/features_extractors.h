@@ -148,6 +148,37 @@ public:
 
 
 //----------------------------------------------------------------------------------------------------
+//	GlobalWavFeaturesExtractor(BaseFeatureExtractor) class
+//----------------------------------------------------------------------------------------------------
+
+
+class GlobalWavFeaturesExtractor : public BaseFeaturesExtractor{
+
+	/*
+	*	Extract whole wav file features. Using Python script to do that.
+	*/
+
+private:
+	int number_of_global_wav_features_;
+
+public:
+
+	GlobalWavFeaturesExtractor(
+		const std::string& path_to_wav_file
+		, int sample_rate
+		, int frame_length
+		, int frame_shift
+		, int number_of_global_wav_features
+		, bool normilize_wav
+	);
+
+	// main method to extract whole wav file features (for now using python script)
+	void extract();
+};
+
+
+
+//----------------------------------------------------------------------------------------------------
 //	FeaturesCombiner class
 //----------------------------------------------------------------------------------------------------
 

@@ -7,6 +7,7 @@ usage_help="
    -m, --mode=...           [Default: none]     : 'train' or 'test' (or 'none')
    --nb-mfcc=...            [Default: 13]       : number of mfcc coefficients (int).
    --nb-fbank=...           [Default: 26]       : number of filterbanks (int).
+   --nb-global=...			[Default: 20]		: number of most strongest frequencies in wav frame
    --reparse-wav            [Default: false]    : if we want to reparse all wav files (for train).
    -n, --norm               [Default: false]    : normilize audio file or not.
    --frame-window=...       [Default: 2.0]      : frame window in seconds to create train and test.
@@ -15,8 +16,13 @@ usage_help="
                                                   No impact if mode=test
    --main-voice-class=...   [Default: 1]        : main class (one of voice unique ids) in one-vs-all train mode. 
                                                   No impact if --one-vs-all was not specified
-   -lc, --load-config		[Default: 1]		: load config files to initialize all variables. Loading after all
+   -lc, --load-config		[Default: true]		: load config files to initialize all variables. Loading after all
    												  other parameters parsed. Be sure not to rewrite parameters.
+   --model=...				[Default: NN]		: Choose model to train. Available:
+   													- NN = NeuralNetworkModel
+   													- RF = RandomForestModel
+   --two-step				[Default: false]	: Use secondary trained model to classify voice if first model
+   												  was not sure about classification	
 "
 
 #################################################################################################################
@@ -74,19 +80,49 @@ function load_config_file(){
 	done < 'config.conf'
 }
 
+function write_config_file(){
+    # Write config file with correct (current) parameters
+    # for user usage (when  user want to use system - he do not need to specify
+    # running parameters, so we write them back in file, from where we read them)
+
+    # clear file
+    : > config.conf
+
+    # write all config parameters
+    for i in "${!parameters[@]}"
+    do
+        echo $i=${parameters[$i]} >> config.conf
+    done
+}
+
+
 function run_program_with_parameters(){
 	# Running auth system with specified parameters
 	# (all parameters should be specified by now)
-	$main_interface_folder$output_executable_name \
+
+    #debug output
+    echo
+    echo 'Running system with parameters:'
+    for i in "${!parameters[@]}"
+    do
+        echo " - $i = ${parameters[$i]}"
+    done
+    echo
+
+    # run system
+	system/executable \
         ${parameters[mode]} \
         ${parameters[nb_mfcc]} \
         ${parameters[nb_fbank]} \
+        ${parameters[nb_global]} \
         ${parameters[reparse_wav]} \
         ${parameters[norm]} \
         ${parameters[frame_window]} \
         ${parameters[frame_step]} \
         ${parameters[one_vs_all]} \
-        ${parameters[main_voice_class]}
+        ${parameters[main_voice_class]} \
+        ${parameters[model]} \
+        ${parameters[two_step]}
 }
 
 
@@ -102,18 +138,21 @@ parameters[recompile]=0
 parameters[mode]="test"
 parameters[nb_mfcc]=13
 parameters[nb_fbank]=26
+parameters[nb_global]=20
 parameters[reparse_wav]=0
-parameters[norm]=1
+parameters[norm]=0
 parameters[frame_window]=2.0
 parameters[frame_step]=1.0
-parameters[one_vs_all]=1
+parameters[one_vs_all]=0
 parameters[main_voice_class]=1
 parameters[load_config]=0
+parameters[model]="NN"
+parameters[two_step]=0
 
 # declare some paths to be able to run scripts and etc 
 # (NOTE: need to sync with settings.h)
 path_to_script="/home/kolegor/Code/VAS/"
-main_interface_folder=$path_to_script"system/"
+main_interface_folder=$path_to_script"system/executable"
 source_folder=$main_interface"source/"
 output_executable_name="executable"
 classification_result_file=$path_to_script"data/_last_recorded_wav_prediction.txt"
@@ -133,16 +172,19 @@ while :; do
             parameters[recompile]=1
             ;;
         -m)
-            check_and_change "mode" $2 "train" "test"
+            check_and_change "mode" $2 "train" "test" "none"
             ;;
         --mode=?*|--mode=)
-            check_and_change "mode" ${1#*=} "train" "test"
+            check_and_change "mode" ${1#*=} "train" "test" "none"
             ;;
         --nb-mfcc=?*|--nb-mfcc=)
             check_number_parameter "nb_mfcc" ${1#*=}
             ;;
         --nb-fbank=?*|--nb-fbank=)
             check_number_parameter "nb_fbank" ${1#*=}
+            ;;
+        --nb-global=?*|--nb-global=)
+            check_number_parameter "nb_global" ${1#*=}
             ;;
         --reparse-wav)
             parameters[reparse_wav]=1
@@ -164,6 +206,12 @@ while :; do
             ;;
         -lc|--load-config)
             parameters[load_config]=1
+            ;;
+        --model=?*|--model=)
+            check_and_change "model" ${1#*=} "NN" "RF"
+            ;;
+        --two-step)
+            parameters[two_step]=1
             ;;
         -?*)
             printf "ERROR: Unknown option: $1\n"
@@ -190,32 +238,14 @@ fi
 # if we need to recompile all source files
 if [[ ${parameters[recompile]} == 1 ]]; then
     echo 'SYS: Compiling...'
-    g++ -std=c++11 "$main_interface_folder"main_interface.cpp \
+    g++ -std=c++11 system/main_interface.cpp \
         -lboost_regex -lboost_filesystem -lboost_system -lm \
-        -o $main_interface_folder$output_executable_name
+        -o system/executable
     printf "SYS: Done.\n"
 fi
 
-# train or test out system
-if [[ ${parameters[mode]} == "test" ]]; then
-    # Prepare user for recording
-    printf "SYS: You will have 5 seconds to record your voice. Recording will start in\n"
-    sleep 3
-    for i in {3..1}; do echo "$i..." && sleep 1; done
-    echo "RECORDING..."
-    (python "$main_interface_folder"wav_record.py "data/recorded.wav")
+# save current script parameters in config file
+write_config_file
 
-    # Run nn classification
-    printf "\nSYS: Request to authentication system kernel to classify your voice.\n"
-    run_program_with_parameters
-
-    # Check the results
-    read -d $'\x04' name < "$classification_result_file"
-    if [[ $name == "0" ]]; then
-        echo 'DANGER! DANGER!'
-    else
-        echo "Welcome, master Egor!"
-    fi
-else
-	run_program_with_parameters
-fi
+# run main programm with collected parameters
+run_program_with_parameters

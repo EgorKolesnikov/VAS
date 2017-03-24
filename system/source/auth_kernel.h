@@ -39,7 +39,10 @@ private:
 	int sound_sample_rate_;					// sample rate of each wav file (should be same)
 	int number_of_mfcc_features_;			// number of mfcc coeffs to create for each wav file
 	int number_of_fbank_features_;			// number of fbank coeffs to create for each wav file
+	int number_of_global_wav_features_;		// number of biggest fft coefficients to extract (most strongs frequencies)
 	bool normilize_audio_;					// normilize audio files or not
+	std::string model_name_;			    // model to train (one of available ['NN', 'RF'])
+	bool two_step_classification_;			// use secondary trained model to classify voice after first model results
 
 
 protected:
@@ -51,10 +54,10 @@ protected:
 	bool check_wav_file_format(const WavHeader& wav_header);
 
 	// extract features from one specified wav file
-	void extract_features_from_wav_file(const std::string& path_to_wav_file, const std::string& path_to_store_results);
+	void extract_features_from_wav_file(const std::string& path_to_wav_file, const std::string& path_to_store_results, const std::string& path_to_store_global_file_features);
 
 	// load all parsed files with their classes
-	std::vector<std::pair<int, std::vector<double>>> load_parsed_files();
+	std::vector<std::pair<int, std::vector<double>>> load_parsed_files(const std::string& folders_to_parse_prefix, const std::string& filename_substring = "");
 
 
 public:
@@ -65,14 +68,24 @@ public:
 		, int sound_sample_rate
 		, int number_of_mfcc_features
 		, int number_of_fbank_features
-		, bool normilize_audio = false
+		, int number_of_global_wav_features
+		, bool normilize_audio
+		, std::string model_name
+		, bool two_step_classification
 	);
 
 	// extract features from all wav files (from folders specified in SETTINGS::)
 	void extract_features();
 
 	// create train test from parsed audio files (see more info in method docstring)
-	void create_train_test(const std::string& folder_to_save, bool one_vs_all = true, int main_class = 1, double train_size = 0.8);
+	void create_train_test(
+		const std::string& folder_to_save
+		, const std::string& train_filename
+		, const std::string& test_filename
+		, const std::string& folders_to_parse_prefix
+		, bool one_vs_all = true
+		, int main_class = 1
+	);
 	
 	// train model and save dump (in model format we store model dump and train_test data)
 	int fit(const std::string& model_folder);

@@ -1,10 +1,10 @@
 import sys
 import numpy as np
 from python_speech_features import mfcc
-from utilities import get_wav_amplitudes, silence
+from utilities import get_wav_amplitudes
 
 
-def run_python_mfcc(
+def extract_mfcc_features(
     path_to_wav_file
     , path_to_output_features
     , sample_rate
@@ -32,11 +32,14 @@ def run_python_mfcc(
     )
     
     # we do not want to have empty files with features
-    if len(frames_features) != 0:
-        with open(path_to_output_features, 'w') as outf:
-            for frame in frames_features:
-                outf.write(' '.join(map(lambda x: str(x), frame)) + '\n')
+    if len(frames_features) == 0:
+    	return
+
+    # save features
+    with open(path_to_output_features, 'w') as outf:
+        for frame in frames_features:
+            outf.write(' '.join(map(lambda x: str(x), frame)) + '\n')
 
 
 if __name__ == '__main__':
-    run_python_mfcc(*sys.argv[1:])
+    extract_mfcc_features(*sys.argv[1:])

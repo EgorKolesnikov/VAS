@@ -197,6 +197,60 @@ void FbankFeaturesExtractor::extract(){
 
 
 //----------------------------------------------------------------------------------------------------
+//	GlobalWavFeaturesExtractor(BaseFeatureExtractor) class
+//----------------------------------------------------------------------------------------------------
+
+
+GlobalWavFeaturesExtractor::GlobalWavFeaturesExtractor(
+	const std::string& path_to_wav_file
+	, int sample_rate
+	, int frame_length
+	, int frame_shift
+	, int number_of_global_wav_features
+	, bool normilize_wav
+) :
+	BaseFeaturesExtractor(
+		path_to_wav_file
+		, sample_rate
+		, frame_length
+		, frame_shift
+		, normilize_wav
+	)
+	, number_of_global_wav_features_(number_of_global_wav_features)
+{ }
+
+
+void GlobalWavFeaturesExtractor::extract(){
+	/*
+	*	Computing FBANK features here. Running python script to do that.
+	*/
+
+	try{
+		// running python script to compute MFCC features
+		this->run_python_script(
+			SETTINGS::PYTHON_GLOBAL_WAV_FEATURES_SCRIPT_PATH, {
+				this->path_to_wav_file_
+				, SETTINGS::TEMP_GLOBAL_WAV_FEATURES_OUTPUT_PATH
+				, std::to_string(this->sample_rate_)
+				, std::to_string(this->frame_length_)
+				, std::to_string(this->frame_shift_)
+				, std::to_string(this->number_of_global_wav_features_)
+				, std::to_string(this->normilize_audio_)
+			}
+		);
+
+		// load computed features
+		this->save_python_script_result(SETTINGS::TEMP_GLOBAL_WAV_FEATURES_OUTPUT_PATH);
+	}
+	catch(std::exception& e){
+		std::cout << "MFCCFeaturesExtractor::extract_frame_features(...). Exception while extracting MFCC features.\n";
+		std::cout << e.what() << '\n';
+	}
+}
+
+
+
+//----------------------------------------------------------------------------------------------------
 //	FeaturesCombiner class
 //----------------------------------------------------------------------------------------------------
 
@@ -251,7 +305,7 @@ void FeaturesCombiner::combine(){
 			}
 		}
 
-		// if everything is ok - write features to this->path_to_store_results
+		// write features to output file
 		std::ofstream outf(this->path_to_store_results_);
 		for(size_t frame_index = 0; frame_index < number_of_frames; ++frame_index){
 			for(auto& feature_extractor_results : all_features){
