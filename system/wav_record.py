@@ -45,7 +45,7 @@ class Recorder:
         waveFile.close()
 
 
-def record(seconds=5, return_frames=False):
+def record(seconds=10, return_frames=False):
     recorder = Recorder()
     frames = recorder.record(seconds=seconds)
     recorder.save(frames)

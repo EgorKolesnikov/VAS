@@ -3,26 +3,23 @@
 #################################################################################################################
 
 usage_help="
-   -r, --recompile          [Default: false]    : if we want to recompile all source or not.
-   -m, --mode=...           [Default: none]     : 'train' or 'test' (or 'none')
-   --nb-mfcc=...            [Default: 13]       : number of mfcc coefficients (int).
-   --nb-fbank=...           [Default: 26]       : number of filterbanks (int).
-   --nb-global=...			[Default: 20]		: number of most strongest frequencies in wav frame
-   --reparse-wav            [Default: false]    : if we want to reparse all wav files (for train).
-   -n, --norm               [Default: false]    : normilize audio file or not.
-   --frame-window=...       [Default: 2.0]      : frame window in seconds to create train and test.
-   --frame-step=...         [Default: 1.0]      : frame step in seconds to create train and test.
-   --one-vs-all             [Default: false]    : whether or not we want to train model in one-vs-all mode. 
-                                                  No impact if mode=test
-   --main-voice-class=...   [Default: 1]        : main class (one of voice unique ids) in one-vs-all train mode. 
-                                                  No impact if --one-vs-all was not specified
-   -lc, --load-config		[Default: true]		: load config files to initialize all variables. Loading after all
-   												  other parameters parsed. Be sure not to rewrite parameters.
-   --model=...				[Default: NN]		: Choose model to train. Available:
-   													- NN = NeuralNetworkModel
-   													- RF = RandomForestModel
-   --two-step				[Default: false]	: Use secondary trained model to classify voice if first model
-   												  was not sure about classification	
+    -r, --recompile             [Default: false]    : if we want to recompile all source or not.
+    -m, --mode=...              [Default: none]     : 'train' or 'test' (or 'none')
+    --nb-mfcc=...               [Default: 13]       : number of mfcc coefficients (int).
+    --nb-fbank=...              [Default: 26]       : number of filterbanks (int).
+    --reparse-wav               [Default: false]    : if we want to reparse all wav files (for train).
+    -n, --norm                  [Default: false]    : normilize audio file or not.
+    --frame-window=...          [Default: 2.0]      : frame window in seconds to create train and test.
+    --frame-step=...            [Default: 1.0]      : frame step in seconds to create train and test.
+    --one-vs-all                [Default: false]    : whether or not we want to train model in one-vs-all mode. No impact if mode=test
+    --main-voice-class=...      [Default: -1]       : main class (one of voice unique ids) in one-vs-all train mode. No impact if --one-vs-all was not specified
+    -lc, --load-config          [Default: true]     : load config files to initialize all variables. Loading after all other parameters parsed. Be sure not to rewrite parameters.
+    --model=...                 [Default: NN]       : Choose model to train. Available:
+                                                        - NN = NeuralNetworkModel
+                                                        - RF = RandomForestModel
+    --features-preprocess=...   [Default: 0]        : Features preprocess algorithm. Available:
+                                                        - 0 = No preprocess
+                                                        - 1 = Normalization (mean and std)
 "
 
 #################################################################################################################
@@ -70,14 +67,14 @@ function check_number_parameter(){
 }
 
 function load_config_file(){
-	# Loading configuration file 'config.conf', where all parameters stored in format:
-	# 'key=value'. Reading these key value entries and overwrite existing parameters
-	
-	IFS="="
-	while read -r name value
-	do
-		parameters["$name"]=$value
-	done < 'config.conf'
+    # Loading configuration file 'config.conf', where all parameters stored in format:
+    # 'key=value'. Reading these key value entries and overwrite existing parameters
+    
+    IFS="="
+    while read -r name value
+    do
+        parameters["$name"]=$value
+    done < 'config.conf'
 }
 
 function write_config_file(){
@@ -97,8 +94,8 @@ function write_config_file(){
 
 
 function run_program_with_parameters(){
-	# Running auth system with specified parameters
-	# (all parameters should be specified by now)
+    # Running auth system with specified parameters
+    # (all parameters should be specified by now)
 
     #debug output
     echo
@@ -110,11 +107,10 @@ function run_program_with_parameters(){
     echo
 
     # run system
-	system/executable \
+    system/executable \
         ${parameters[mode]} \
         ${parameters[nb_mfcc]} \
         ${parameters[nb_fbank]} \
-        ${parameters[nb_global]} \
         ${parameters[reparse_wav]} \
         ${parameters[norm]} \
         ${parameters[frame_window]} \
@@ -122,7 +118,7 @@ function run_program_with_parameters(){
         ${parameters[one_vs_all]} \
         ${parameters[main_voice_class]} \
         ${parameters[model]} \
-        ${parameters[two_step]}
+        ${parameters[features_preprocess]}
 }
 
 
@@ -138,7 +134,6 @@ parameters[recompile]=0
 parameters[mode]="test"
 parameters[nb_mfcc]=13
 parameters[nb_fbank]=26
-parameters[nb_global]=20
 parameters[reparse_wav]=0
 parameters[norm]=0
 parameters[frame_window]=2.0
@@ -147,7 +142,7 @@ parameters[one_vs_all]=0
 parameters[main_voice_class]=1
 parameters[load_config]=0
 parameters[model]="NN"
-parameters[two_step]=0
+parameters[features_preprocess]=0
 
 # declare some paths to be able to run scripts and etc 
 # (NOTE: need to sync with settings.h)
@@ -183,9 +178,6 @@ while :; do
         --nb-fbank=?*|--nb-fbank=)
             check_number_parameter "nb_fbank" ${1#*=}
             ;;
-        --nb-global=?*|--nb-global=)
-            check_number_parameter "nb_global" ${1#*=}
-            ;;
         --reparse-wav)
             parameters[reparse_wav]=1
             ;;
@@ -210,8 +202,8 @@ while :; do
         --model=?*|--model=)
             check_and_change "model" ${1#*=} "NN" "RF"
             ;;
-        --two-step)
-            parameters[two_step]=1
+        --features-preprocess=?*|--features-preprocess=)
+            check_number_parameter "features_preprocess" ${1#*=}
             ;;
         -?*)
             printf "ERROR: Unknown option: $1\n"
@@ -224,10 +216,10 @@ while :; do
 done
 
 
-#	Loading configuration file if we want to
+#   Loading configuration file if we want to
 if [[ ${parameters[load_config]} == 1 ]]; then
-	echo 'SYS. Loading parameters from config file'
-	load_config_file
+    echo 'SYS. Loading parameters from config file'
+    load_config_file
 fi
 
 
@@ -239,7 +231,7 @@ fi
 if [[ ${parameters[recompile]} == 1 ]]; then
     echo 'SYS: Compiling...'
     g++ -std=c++11 system/main_interface.cpp \
-        -lboost_regex -lboost_filesystem -lboost_system -lm \
+        -lboost_regex -lboost_filesystem -lboost_system -lm -pthread\
         -o system/executable
     printf "SYS: Done.\n"
 fi

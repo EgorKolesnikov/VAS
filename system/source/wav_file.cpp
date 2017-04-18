@@ -82,7 +82,7 @@ void WavHeader::print(){
 */
 
 WavFile::WavFile() {
-	this->data = new char[19];
+	this->data = new char[42];
 }
 
 WavFile::WavFile(const std::string& filename){
@@ -130,9 +130,13 @@ std::vector<short> WavFile::get_amplitudes(){
 	*/
 
 	try{
+		// raw parse is good here
 		short* new_data = reinterpret_cast<short *>(data);
+		
+		// 16 bit = 2 bytes
 		int number_of_samples = wav_header.subchunk2_size / 2;
 		
+		// convert to vector
 		std::vector<short> amplitudes;
 		amplitudes.reserve(number_of_samples);
 		std::move(new_data, new_data + number_of_samples, std::back_inserter(amplitudes));
@@ -148,8 +152,8 @@ std::vector<short> WavFile::get_amplitudes(){
 
 void WavFile::write_amplitudes(const std::string& destination_file){
 	/*
-	*	Writing wav file amplitudes to specified wav file. First need to get data
-	*	in amplitudes format. Write result in 'destination_file' separating amplitudes with spaces
+	*	Writing wav file amplitudes to specified wav file separating amplitudes with spaces. 
+	*	First need to get data in amplitudes format.
 	*/
 
 	try{

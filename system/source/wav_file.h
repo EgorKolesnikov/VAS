@@ -1,21 +1,16 @@
-#ifndef __WAV_FILE__
-#define __WAV_FILE__
+#pragma once
 
-
-#include <iostream>
 #include <vector>
 #include <fstream>
 #include <iterator>
+#include <iostream>
 
-
-//----------------------------------------------------------------------------------------------------
-//	WavHeader helper structure
-//----------------------------------------------------------------------------------------------------
 
 struct WavHeader{
 
 	/*
-	*	Structure contains information about wav file header.
+	*	Wrapper for wav file header.
+	*	(easy read, easy usage)
 	*/
 
 	static const char HEADER_SIZE = 44;
@@ -58,22 +53,17 @@ public:
 };
 
 
-//----------------------------------------------------------------------------------------------------
-//	WavFile class
-//----------------------------------------------------------------------------------------------------
-
 class WavFile {
 
 	/*
 	*	Class to work with wav files. Methods implements only routine
-	*	which was needed for VAS correct work. More info see in declarations below
-	*	or in methods implementation comments. 
+	*	which was needed for VAS correct work. 
 	*/
 
 private:
 
-	WavHeader wav_header;
-	char* data;
+	WavHeader wav_header;	// header data is stored here
+	char* data;				// main wav file data is stored here
 
 
 protected:
@@ -86,6 +76,7 @@ protected:
 
 	// clones data (another_file.data to this->data)
 	void clone_file(const WavFile& another_file);
+
 
 public:
 
@@ -113,7 +104,7 @@ public:
 	*	Main interface
 	*/
 
-	// loads data from file (no need of that if contructor with string parameter has been used)
+	// loads data from file (header and this->data)
 	void load(const std::string& filename);
 
 	// returns loaded wav file header
@@ -129,5 +120,3 @@ public:
 	void write_amplitudes(const std::string& destination_file);
 
 };
-
-#endif

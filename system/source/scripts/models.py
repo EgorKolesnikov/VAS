@@ -1,11 +1,16 @@
 import keras
 import sys
+import json
 import pandas
 import numpy as np
 import cPickle
 from sklearn.ensemble import RandomForestClassifier
 from utilities import load_test_wav_features
 
+
+MAIN_MODELS_NAMES = [
+    'NN', 'RF'
+]
 
 class BaseModel(object):
 
@@ -36,13 +41,34 @@ class BaseModel(object):
         self.path_to_dump = path_to_dump
         self.model = None
 
-    def _check_input_data(self, X, y):
-    	"""
-    	Minor training data format checks
+        # we can save any data we want in here
+        self.model_secondary_data = {}
+        
+        # dump and load that data when dumping and loading model
+        self.model_secondary_data_dump_filename = self.path_to_dump[:self.path_to_dump.rfind('/') + 1] + 'secondary_model_data.dump'
 
-    	:param X: train objects
-    	:param y: train objects classes  
-    	"""
+
+    def _save_model_secondary_data(self):
+        """
+        Save all collected model_routine_data in special file (self.model_secondary_data_dump_filename)
+        """
+        with open(self.model_secondary_data_dump_filename, 'w') as outf:
+            json.dump(self.model_secondary_data, outf)
+
+    def _load_model_secondary_data(self):
+        """
+        Load model secondary data from dump (save in self.model_secondary_data)
+        """
+        with open(self.model_secondary_data_dump_filename, 'r') as inf:
+            self.model_secondary_data = json.load(inf)
+
+    def _check_input_data(self, X, y):
+        """
+        Minor training data format checks
+
+        :param X: train objects
+        :param y: train objects classes  
+        """
         if len(y) == 0:
             raise Exception('BaseModel::_check_input_data(...). Empty "y_train" values.')
         if len(X) == 0:
@@ -51,12 +77,12 @@ class BaseModel(object):
             raise Exception('BaseModel::_check_input_data(...). Train samples lengths in X_train are not equal.')
 
     def load_or_create(self, create_mode):
-    	"""
-    	Constructing model. Creating new model or loading from dump.
+        """
+        Constructing model. Creating new model or loading from dump.
 
-    	:param create_mode - Mode of model constructing (see BaseModel::CREATE_MODEL_MODES)
-    	:return			   None (saving model objects in self.model)
-    	"""
+        :param create_mode - Mode of model constructing (see BaseModel::CREATE_MODEL_MODES)
+        :return            None (saving model objects in self.model)
+        """
         if create_mode.lower() not in BaseModel.CREATE_MODEL_MODES:
             raise Exception(
                 'BaseModel::_load_or_create(...). Invalid "create_mode" parameter value (got {0} expected one of {1})'.format(
@@ -66,17 +92,18 @@ class BaseModel(object):
         # create or load model
         if create_mode == 'load':
             self.load_model_dump()
+            self._load_model_secondary_data()
         else:
             self.create_new_model()
 
     def train_and_save(self, X_train, y_train, train_mode='multiclass'):
-    	"""
-	    Train model loaded or created before.
+        """
+        Train model loaded or created before.
 
-	    :param X_train 		- train objects features (check only for non empty)
-	    :param y_train 		- train objects classes  (check only for non empty)
-	    :param train_mode 	- Mode of train procedure (see BaseModel::TRAIN_MODES for possible modes)
-    	"""
+        :param X_train      - train objects features (check only for non empty)
+        :param y_train      - train objects classes  (check only for non empty)
+        :param train_mode   - Mode of train procedure (see BaseModel::TRAIN_MODES for possible modes)
+        """
 
         self._check_input_data(X_train, y_train)
         
@@ -88,45 +115,41 @@ class BaseModel(object):
 
         self.load_or_create(create_mode='create')
         self.fit(X_train, y_train)
+        
         self.save_model_dump()
+        self._save_model_secondary_data()
 
     def load_and_test(self, X_test, y_test):
-    	"""
-    	Testing trained before model. Loading model from dump.
+        """
+        Testing trained before model. Loading model from dump.
 
-    	:param X_test 		- train objects features (check only for non empty)
-	    :param y_test 		- train objects classes  (check only for non empty)
-    	"""
+        :param X_test       - train objects features (check only for non empty)
+        :param y_test       - train objects classes  (check only for non empty)
+        """
 
         self._check_input_data(X_test, y_test)
         self.load_or_create(create_mode='load')
         return self.test(X_test, y_test)
 
-    def predict_one_wav(self, path_to_wav_features, predict_mode='probabilities'):
-    	"""
-    	Testing already trained model with input wav file features (only one file)
+    def predict_one_wav(self, wav_feautres, predict_mode='probabilities'):
+        """
+        Testing already trained model with input wav file features (only one file)
 
-    	:param path_to_wav_features - path to txt file with frames features of wav file
-    	:param predict_mode 		- specifying output format (see possible modes in BaseModel::PREDICT_MODES)
-    	:return						Prediction results in specified format
-    	"""
+        :param wav_feautres    - features of test wav file
+        :param predict_mode    - specifying output format (see possible modes in BaseModel::PREDICT_MODES)
+        :return                Prediction results in specified format
+        """
         if predict_mode.lower() not in BaseModel.PREDICT_MODES:
             raise Exception(
                 'BaseModel::predict_one_wav(...). Invalid "predict_mode" parameter value (got {0} expected one of {1})'.format(
                     predict_mode, BaseModel.PREDICT_MODES
             ))
 
-        # load saved previously model
-        self.load_or_create(create_mode='load')
-
-        # load wav file features
-        features = load_test_wav_features(path_to_wav_features)
-
         # predict classes
         if predict_mode == 'probabilities':
-            prediction = self.predict_proba(features)
+            prediction = self.predict_proba(wav_feautres)
         else:
-            prediction = self.predict_class(features)
+            prediction = self.predict_class(wav_feautres)
 
         return prediction
 
@@ -204,36 +227,3 @@ class RandomForestModel(BaseModel):
 
     def test(self, X_test, y_test):
         return self.model.score(X_test, y_test)
-
-
-class SecondaryModel(BaseModel):
-    def __init__(self, path_to_dump):
-        super(NeuralNetModel, self).__init__(path_to_dump)
-
-    def create_new_model(self):
-        raise Exception('SecondaryModel::create_new_model(...). Not implemented yet.')
-    
-    def load_model_dump(self):
-        raise Exception('SecondaryModel::load_model_dump(...). Not implemented yet.')
-
-    def save_model_dump(self):
-        raise Exception('SecondaryModel::save_model_dump(...). Not implemented yet.')
-
-    def fit(self, X_train, y_train):
-        raise Exception('SecondaryModel::fit(...). Not implemented yet.')
-
-    def predict_proba(self, test_sample):
-        raise Exception('SecondaryModel::predict_proba(...). Not implemented yet.')
-
-    def predict_class(self, test_sample):
-        raise Exception('SecondaryModel::predict_class(...). Not implemented yet.')
-
-    def test(self, X_test, y_test):
-        raise Exception('SecondaryModel::test(...). Not implemented yet.')
-
-
-# not using SecondaryModel, because we can not use SecondaryModel
-# as main model 
-MAIN_MODELS_NAMES = [
-    'NN', 'RF'
-]
